@@ -24,8 +24,27 @@ fn create_test_data() -> Vec<i32> {
     ]
 }
 
+fn aabb_from_data<T: IndexableNum>(data: &[T]) -> Vec<AABB<T>> {
+    (0..data.len())
+        .step_by(4)
+        .map(|i| AABB::new(data[i], data[i + 1], data[i + 2], data[i + 3]))
+        .collect()
+}
+
 fn create_index<T: IndexableNum>(data: &[T]) -> StaticAABB2DIndex<T> {
-    let mut builder = StaticAABB2DIndexBuilder::new(data.len() / 4);
+    let mut builder = StaticAABB2DIndexBuilder::new_with_node_size(data.len() / 4, 16);
+    for pos in (0..data.len()).step_by(4) {
+        builder.add(data[pos], data[pos + 1], data[pos + 2], data[pos + 3]);
+    }
+
+    builder.build().unwrap()
+}
+
+fn create_index_with_node_size<T: IndexableNum>(
+    data: &[T],
+    node_size: usize,
+) -> StaticAABB2DIndex<T> {
+    let mut builder = StaticAABB2DIndexBuilder::new_with_node_size(data.len() / 4, node_size);
     for pos in (0..data.len()).step_by(4) {
         builder.add(data[pos], data[pos + 1], data[pos + 2], data[pos + 3]);
     }
@@ -116,31 +135,9 @@ fn skip_sorting_small_index() {
     assert_eq!(index.max_x(), 96);
     assert_eq!(index.max_y(), 93);
 
-    let mut level_bound_counts: Vec<usize> = Vec::new();
-    let mut level_boxes: Vec<Vec<AABB<i32>>> = Vec::new();
-    let mut current_level = usize::max_value();
-
-    let mut visitor = |level: usize, aabb: &AABB<i32>| {
-        if level != current_level {
-            current_level = level;
-            level_bound_counts.push(1);
-            level_boxes.push(Vec::new());
-        } else {
-            *level_bound_counts.last_mut().unwrap() += 1;
-        }
-
-        level_boxes.last_mut().unwrap().push(*aabb);
-
-        true
-    };
-
-    index.visit_all_boxes(&mut visitor);
-
-    assert_eq!(level_bound_counts.len(), 2);
-    assert_eq!(level_bound_counts, vec![1, 14]);
-
-    assert_eq!(level_boxes[0].len(), 1);
-    assert_eq!(level_boxes[0][0], AABB::new(0, 2, 96, 93));
+    assert_eq!(index.level_bounds().len(), 2);
+    assert_eq!(index.level_bounds(), vec![14, 15]);
+    assert_eq!(index.all_boxes().len(), 15);
 
     let expected_item_boxes = [
         AABB::new(8, 62, 11, 66),
@@ -159,72 +156,46 @@ fn skip_sorting_small_index() {
         AABB::new(22, 90, 23, 93),
     ];
 
-    let actual_item_boxes = &level_boxes[1];
+    let actual_item_boxes = index.item_boxes();
     // note order should always match (should not be sorted differently from order added since num_items < node_size)
     assert_eq!(actual_item_boxes, &expected_item_boxes);
 }
 
 #[test]
-fn visit_all_boxes() {
-    let index = create_test_index();
-    let mut boxes: Vec<Vec<AABB<i32>>> = Vec::new();
-    let mut level_bounds: Vec<usize> = Vec::new();
-    let mut level_values: Vec<usize> = Vec::new();
-    let mut current_level = usize::MAX;
+fn many_tree_levels() {
+    let test_data = create_test_data();
+    let input_boxes = aabb_from_data(&test_data);
+    let index = create_index_with_node_size(&test_data, 4);
 
-    let mut visitor = |level, &aabb: &AABB<i32>| {
-        if current_level != level {
-            level_values.push(level);
-            current_level = level;
-            level_bounds.push(1);
-            boxes.push(Vec::new());
+    assert_eq!(index.level_bounds(), vec![100, 125, 132, 134, 135]);
+    assert_eq!(index.count(), test_data.len() / 4);
+    assert_eq!(
+        index.all_boxes().len(),
+        *index.level_bounds().last().unwrap()
+    );
+
+    let all_boxes = index.all_boxes();
+
+    // map_all_boxes_index should map back to original aabb index
+    for i in 0..index.count() {
+        let added_item_index = index.map_all_boxes_index(i);
+        assert_eq!(input_boxes[added_item_index], all_boxes[i]);
+    }
+
+    // map_all_boxes_index should get child start index
+    for parent_node_index in index.count()..all_boxes.len() - 1 {
+        let children_start_index = index.map_all_boxes_index(parent_node_index);
+        let children_end_index = if parent_node_index == all_boxes.len() - 1 {
+            all_boxes.len()
         } else {
-            *level_bounds.last_mut().unwrap() += 1;
+            index.map_all_boxes_index(parent_node_index + 1)
+        };
+
+        // all child boxes should be contained by their parent
+        for i in children_start_index..children_end_index {
+            assert!(all_boxes[parent_node_index].contains_aabb(&all_boxes[i]));
         }
-
-        boxes.last_mut().unwrap().push(aabb);
-
-        true
-    };
-
-    index.visit_all_boxes(&mut visitor);
-
-    assert_eq!(level_values, vec![2, 1, 0]);
-
-    assert_eq!(level_bounds, vec![1, 7, 100]);
-    assert_eq!(boxes[0].len(), 1);
-    assert_eq!(boxes[1].len(), 7);
-    assert_eq!(boxes[2].len(), 100);
-
-    assert_eq!(boxes[0][0], AABB::new(0, 1, 96, 95));
-
-    assert!(boxes[2][0..4]
-        .iter()
-        .all(|aabb| { boxes[1][6].contains_aabb(aabb) }));
-
-    assert!(boxes[2][4..20]
-        .iter()
-        .all(|aabb| { boxes[1][5].contains_aabb(aabb) }));
-
-    assert!(boxes[2][20..36]
-        .iter()
-        .all(|aabb| { boxes[1][4].contains_aabb(aabb) }));
-
-    assert!(boxes[2][36..52]
-        .iter()
-        .all(|aabb| { boxes[1][3].contains_aabb(aabb) }));
-
-    assert!(boxes[2][52..68]
-        .iter()
-        .all(|aabb| { boxes[1][2].contains_aabb(aabb) }));
-
-    assert!(boxes[2][68..84]
-        .iter()
-        .all(|aabb| { boxes[1][1].contains_aabb(aabb) }));
-
-    assert!(boxes[2][84..100]
-        .iter()
-        .all(|aabb| { boxes[1][0].contains_aabb(aabb) }));
+    }
 }
 
 #[test]

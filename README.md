@@ -1,7 +1,19 @@
-# Summary
-Fast static spatial index data structure for 2D axis aligned bounding boxes. This is a rust port of the excellent [flatbush](https://github.com/mourner/flatbush) javascript library.
+# StaticAABB2DIndex
+## Summary
+Fast static spatial index data structure for 2D axis aligned bounding boxes utilizing hilbert curve spatial ordering. This is a rust port of the excellent [flatbush](https://github.com/mourner/flatbush) javascript library.
 
-# Quick Code Example
+---
+
+## Quick Links
+[Crate](https://crates.io/crates/static_aabb2d_index)
+
+[Documentation](https://docs.rs/static_aabb2d_index/latest/static_aabb2d_index/)
+
+[Examples](/examples)
+
+---
+
+## Quick Code Example
  ```rust
  use static_aabb2d_index::*;
  // create builder for index containing 4 axis aligned bounding boxes

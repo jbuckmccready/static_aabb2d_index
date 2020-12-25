@@ -608,6 +608,12 @@ impl<T: IndexableNum> StaticAABB2DIndex<T> {
     pub fn max_y(&self) -> T {
         self.max_y
     }
+
+    /// Gets the total count of items that were added to the index.
+    pub fn count(&self) -> usize {
+        self.num_items
+    }
+
     /// Queries the index, returning a collection of indexes to items that overlap with the bounding box given.
     ///
     /// `min_x`, `min_y`, `max_x`, and `max_y` represent the bounding box to use for the query. Indexes returned
@@ -634,67 +640,43 @@ impl<T: IndexableNum> StaticAABB2DIndex<T> {
     }
 
     /// Returns all the item [AABB] that were added to the index by [StaticAABB2DIndexBuilder::add].
-    /// The order of the boxes is not defined. Use [StaticAABB2DIndex::visit_item_boxes] if the original
-    /// added item index position is needed.
+    ///
+    /// Use [StaticAABB2DIndex::map_all_boxes_index] to map a box back to the original index position it was added.
     pub fn item_boxes(&self) -> &[AABB<T>] {
         &self.boxes[0..self.num_items]
     }
 
-    /// Visits all the item [AABB] with a `visitor` function that were added to the index by [StaticAABB2DIndexBuilder::add].
+    /// Gets the node size used for the [StaticAABB2DIndex].
     ///
-    /// The `visitor` function receives a [usize] for the item index (corresponding to the order the item was added),
-    /// and a &[AABB] representing the item. The `visitor` returns a bool indicating whether to continue visiting (true) or not (false).
-    pub fn visit_item_boxes<F>(&self, visitor: &mut F)
-    where
-        F: FnMut(usize, &AABB<T>) -> bool,
-    {
-        for (i, b) in self.boxes.iter().take(self.num_items).enumerate() {
-            if !visitor(self.indices[i], b) {
-                break;
-            }
-        }
+    /// The node size is the maximum number of boxes stored as children of each node in the index tree.
+    pub fn node_size(&self) -> usize {
+        self.node_size
     }
 
-    /// Visits all the the [AABB] in the index tree with a `visitor` function (includes items added and surrounding boxes for indexing).
+    /// Gets the level bounds for all the boxes in the [StaticAABB2DIndex].
     ///
-    /// The `visitor` function receives a [usize] representing the tier/level in the index tree, and a &[AABB] representing the
-    /// bounding box for the item or parent node in the tree. Levels go from the bottom up, so level 0 corresponds to the added items,
-    /// level 1 to the boxes that surround those items (parents), level 2 boxes that surround level 1 boxes (grandparents), etc.
-    /// The `visitor` returns a bool indicating whether to continue visiting (true) or not (false).
-    pub fn visit_all_boxes<F>(&self, visitor: &mut F)
-    where
-        F: FnMut(usize, &AABB<T>) -> bool,
-    {
-        let mut stack = Vec::with_capacity(16);
-        let mut node_index = self.boxes.len() - 1;
-        let mut level = self.level_bounds.len() - 1;
+    /// The level bounds are the index positions in [StaticAABB2DIndex::all_boxes] where a change in the level of the index tree occurs.
+    pub fn level_bounds(&self) -> &[usize] {
+        &self.level_bounds
+    }
 
-        'traverse_loop: loop {
-            let end = min(
-                node_index + self.node_size,
-                *get_at_index!(self.level_bounds, level),
-            );
+    /// Gets all the bounding boxes for the [StaticAABB2DIndex].
+    ///
+    /// The boxes are ordered from the bottom of the tree up, so from 0 to [StaticAABB2DIndex::count] are all the item bounding boxes.
+    /// Use [StaticAABB2DIndex::map_all_boxes_index] to map a box back to the original index position it was added or find the start
+    /// position for the children of a node box.
+    pub fn all_boxes(&self) -> &[AABB<T>] {
+        &self.boxes
+    }
 
-            for pos in node_index..end {
-                let aabb = get_at_index!(self.boxes, pos);
-                let index = *get_at_index!(self.indices, pos);
-                if !visitor(level, aabb) {
-                    break 'traverse_loop;
-                }
-
-                if node_index >= self.num_items {
-                    stack.push(index);
-                    stack.push(level - 1);
-                }
-            }
-
-            if stack.len() > 1 {
-                level = stack.pop().unwrap();
-                node_index = stack.pop().unwrap();
-            } else {
-                break 'traverse_loop;
-            }
-        }
+    /// Gets the original item index position (from the time it was added) from a [StaticAABB2DIndex::all_boxes]
+    /// slice index position.
+    ///
+    /// If `all_boxes_index` is greater than [StaticAABB2DIndex::count] then it will return the
+    /// [StaticAABB2DIndex::all_boxes] starting index of the node's children boxes.
+    /// See the index_tree_structure.rs example for more information.
+    pub fn map_all_boxes_index(&self, all_boxes_index: usize) -> usize {
+        self.indices[all_boxes_index]
     }
 
     /// Same as [StaticAABB2DIndex::query] but accepts an existing [Vec] to be used as a stack buffer when
