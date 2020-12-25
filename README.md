@@ -2,16 +2,12 @@
 ## Summary
 Fast static spatial index data structure for 2D axis aligned bounding boxes utilizing hilbert curve spatial ordering. This is a rust port of the excellent [flatbush](https://github.com/mourner/flatbush) javascript library.
 
----
-
 ## Quick Links
 [Crate](https://crates.io/crates/static_aabb2d_index)
 
 [Documentation](https://docs.rs/static_aabb2d_index/latest/static_aabb2d_index/)
 
 [Examples](/examples)
-
----
 
 ## Quick Code Example
  ```rust
