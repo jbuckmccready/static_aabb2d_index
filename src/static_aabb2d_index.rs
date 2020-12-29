@@ -761,7 +761,7 @@ where
         results
     }
 
-    /// The same as [query] but instead of returning a [Vec] of results a lazy iterator is returned
+    /// The same as [StaticAABB2DIndex::query] but instead of returning a [Vec] of results a lazy iterator is returned
     /// which yields the results.
     #[inline(always)]
     pub fn query_iter<'a>(
