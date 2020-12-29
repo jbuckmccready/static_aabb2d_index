@@ -266,7 +266,7 @@ impl<T> StaticAABB2DIndexBuilder<T>
 where
     T: IndexableNum,
 {
-    fn init(num_items: usize, node_size: usize) -> StaticAABB2DIndexBuilder<T> {
+    fn init(num_items: usize, node_size: usize) -> Self {
         let node_size = min(max(node_size, 2), 65535);
 
         let mut n = num_items;
@@ -318,7 +318,7 @@ where
 
     /// Construct a new [StaticAABB2DIndexBuilder] to fit exactly the specified `count` number of items.
     #[inline(always)]
-    pub fn new(count: usize) -> StaticAABB2DIndexBuilder<T> {
+    pub fn new(count: usize) -> Self {
         StaticAABB2DIndexBuilder::init(count, 16)
     }
 
@@ -329,7 +329,7 @@ where
     ///
     /// If `node_size` is less than 2 then 2 is used, if `node_size` is greater than 65535 then 65535 is used.
     #[inline(always)]
-    pub fn new_with_node_size(count: usize, node_size: usize) -> StaticAABB2DIndexBuilder<T> {
+    pub fn new_with_node_size(count: usize, node_size: usize) -> Self {
         StaticAABB2DIndexBuilder::init(count, node_size)
     }
 
@@ -337,13 +337,7 @@ where
     ///
     /// For performance reasons the sanity checks of `min_x <= max_x` and `min_y <= max_y` are only debug asserted.
     /// If an invalid box is added it may lead to a panic or unexpected behavior from the constructed [StaticAABB2DIndex].
-    pub fn add(
-        &mut self,
-        min_x: T,
-        min_y: T,
-        max_x: T,
-        max_y: T,
-    ) -> &mut StaticAABB2DIndexBuilder<T> {
+    pub fn add(&mut self, min_x: T, min_y: T, max_x: T, max_y: T) -> &mut Self {
         // catch adding past num_items (error will be returned when build is called)
         if self.pos >= self.num_items {
             self.pos += 1;
@@ -618,7 +612,7 @@ fn swap<T>(
     indices.swap(i, j);
 }
 
-pub struct QueryIterator<'a, T>
+struct QueryIterator<'a, T>
 where
     T: IndexableNum,
 {
@@ -763,6 +757,20 @@ where
 
     /// The same as [StaticAABB2DIndex::query] but instead of returning a [Vec] of results a lazy iterator is returned
     /// which yields the results.
+    ///
+    /// # Examples
+    /// ```
+    /// use static_aabb2d_index::*;
+    /// let mut builder = StaticAABB2DIndexBuilder::new(4);
+    /// builder
+    ///     .add(0.0, 0.0, 2.0, 2.0)
+    ///     .add(-1.0, -1.0, 3.0, 3.0)
+    ///     .add(0.0, 0.0, 1.0, 3.0)
+    ///     .add(4.0, 2.0, 16.0, 8.0);
+    /// let index = builder.build().unwrap();
+    /// let query_results = index.query_iter(-1.0, -1.0, -0.5, -0.5).collect::<Vec<usize>>();
+    /// assert_eq!(query_results, vec![1]);
+    /// ```
     #[inline(always)]
     pub fn query_iter<'a>(
         &'a self,
