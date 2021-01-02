@@ -26,8 +26,16 @@ pub trait IndexableNum: Copy + Num + PartialOrd + Default + Bounded + NumCast {
     }
 }
 
-// Blanket impl for all types satisfying the required trait bounds
-impl<T> IndexableNum for T where T: Copy + Num + PartialOrd + Default + Bounded + NumCast {}
+// impl for all supported built in types
+impl IndexableNum for u16 {}
+impl IndexableNum for i32 {}
+impl IndexableNum for u32 {}
+impl IndexableNum for i64 {}
+impl IndexableNum for u64 {}
+impl IndexableNum for i128 {}
+impl IndexableNum for u128 {}
+impl IndexableNum for f32 {}
+impl IndexableNum for f64 {}
 
 /// Error type for errors that may be returned in attempting to build the index.
 #[derive(Debug, PartialEq)]
