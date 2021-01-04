@@ -6,7 +6,7 @@ use std::fmt;
 /// It is blanket implemented for all primitive numeric types.
 pub trait IndexableNum: Copy + Num + PartialOrd + Default + Bounded + NumCast {
     /// Simple default min implementation for [PartialOrd] types.
-    #[inline(always)]
+    #[inline]
     fn min(self, other: Self) -> Self {
         if self < other {
             return self;
@@ -16,7 +16,7 @@ pub trait IndexableNum: Copy + Num + PartialOrd + Default + Bounded + NumCast {
     }
 
     /// Simple default max implementation for [PartialOrd] types.
-    #[inline(always)]
+    #[inline]
     fn max(self, other: Self) -> Self {
         if self > other {
             return self;
@@ -85,7 +85,7 @@ impl<T> Default for AABB<T>
 where
     T: IndexableNum,
 {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         AABB {
             min_x: T::zero(),
@@ -100,7 +100,7 @@ impl<T> AABB<T>
 where
     T: IndexableNum,
 {
-    #[inline(always)]
+    #[inline]
     pub fn new(min_x: T, min_y: T, max_x: T, max_y: T) -> AABB<T> {
         AABB {
             min_x,
@@ -125,14 +125,14 @@ where
     /// // note: overlap check is inclusive of edges/corners touching
     /// assert!(box_c.overlaps_aabb(&box_a));
     /// ```
-    #[inline(always)]
+    #[inline]
     pub fn overlaps_aabb(&self, other: &AABB<T>) -> bool {
         self.overlaps(other.min_x, other.min_y, other.max_x, other.max_y)
     }
 
     /// Tests if this AABB overlaps another AABB.
     /// Same as [AABB::overlaps_aabb] but accepts AABB extent parameters directly.
-    #[inline(always)]
+    #[inline]
     pub fn overlaps(&self, min_x: T, min_y: T, max_x: T, max_y: T) -> bool {
         if self.max_x < min_x || self.max_y < min_y || self.min_x > max_x || self.min_y > max_y {
             return false;
@@ -151,14 +151,14 @@ where
     /// assert!(box_a.contains_aabb(&box_b));
     /// assert!(!box_b.contains_aabb(&box_a));
     /// ```
-    #[inline(always)]
+    #[inline]
     pub fn contains_aabb(&self, other: &AABB<T>) -> bool {
         self.contains(other.min_x, other.min_y, other.max_x, other.max_y)
     }
 
     /// Tests if this AABB fully contains another AABB.
     /// Same as [AABB::contains] but accepts AABB extent parameters directly.
-    #[inline(always)]
+    #[inline]
     pub fn contains(&self, min_x: T, min_y: T, max_x: T, max_y: T) -> bool {
         self.min_x <= min_x && self.min_y <= min_y && self.max_x >= max_x && self.max_y >= max_y
     }
@@ -325,7 +325,7 @@ where
     }
 
     /// Construct a new [StaticAABB2DIndexBuilder] to fit exactly the specified `count` number of items.
-    #[inline(always)]
+    #[inline]
     pub fn new(count: usize) -> Self {
         StaticAABB2DIndexBuilder::init(count, 16)
     }
@@ -336,7 +336,7 @@ where
     /// calling `StaticAABB2DIndexBuilder::new` is tested to be optimal in most cases.
     ///
     /// If `node_size` is less than 2 then 2 is used, if `node_size` is greater than 65535 then 65535 is used.
-    #[inline(always)]
+    #[inline]
     pub fn new_with_node_size(count: usize, node_size: usize) -> Self {
         StaticAABB2DIndexBuilder::init(count, node_size)
     }
@@ -712,6 +712,11 @@ where
             }
         }
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.aabb_index.num_items))
+    }
 }
 
 impl<T> StaticAABB2DIndex<T>
@@ -719,31 +724,31 @@ where
     T: IndexableNum,
 {
     /// Gets the min_x extent value of the all the bounding boxes in the index.
-    #[inline(always)]
+    #[inline]
     pub fn min_x(&self) -> T {
         self.min_x
     }
 
     /// Gets the min_y extent value of the all the bounding boxes in the index.
-    #[inline(always)]
+    #[inline]
     pub fn min_y(&self) -> T {
         self.min_y
     }
 
     /// Gets the max_x extent value of the all the bounding boxes in the index.
-    #[inline(always)]
+    #[inline]
     pub fn max_x(&self) -> T {
         self.max_x
     }
 
     /// Gets the max_y extent value of the all the bounding boxes in the index.
-    #[inline(always)]
+    #[inline]
     pub fn max_y(&self) -> T {
         self.max_y
     }
 
     /// Gets the total count of items that were added to the index.
-    #[inline(always)]
+    #[inline]
     pub fn count(&self) -> usize {
         self.num_items
     }
@@ -752,7 +757,7 @@ where
     ///
     /// `min_x`, `min_y`, `max_x`, and `max_y` represent the bounding box to use for the query. Indexes returned
     /// match with the order items were added to the index using [StaticAABB2DIndexBuilder::add].
-    #[inline(always)]
+    #[inline]
     pub fn query(&self, min_x: T, min_y: T, max_x: T, max_y: T) -> Vec<usize> {
         let mut results = Vec::new();
         let mut visitor = |i| {
@@ -779,7 +784,7 @@ where
     /// let query_results = index.query_iter(-1.0, -1.0, -0.5, -0.5).collect::<Vec<usize>>();
     /// assert_eq!(query_results, vec![1]);
     /// ```
-    #[inline(always)]
+    #[inline]
     pub fn query_iter<'a>(
         &'a self,
         min_x: T,
@@ -793,7 +798,7 @@ where
     /// Same as [StaticAABB2DIndex::query] but instead of returning a collection of indexes a `visitor`
     /// function is called for each index that would be returned.
     /// The `visitor` returns a bool indicating whether to continue visiting (true) or not (false).
-    #[inline(always)]
+    #[inline]
     pub fn visit_query<F>(&self, min_x: T, min_y: T, max_x: T, max_y: T, visitor: &mut F)
     where
         F: FnMut(usize) -> bool,
@@ -805,7 +810,7 @@ where
     /// Returns all the item [AABB] that were added to the index by [StaticAABB2DIndexBuilder::add].
     ///
     /// Use [StaticAABB2DIndex::map_all_boxes_index] to map a box back to the original index position it was added.
-    #[inline(always)]
+    #[inline]
     pub fn item_boxes(&self) -> &[AABB<T>] {
         &self.boxes[0..self.num_items]
     }
@@ -813,7 +818,7 @@ where
     /// Gets the node size used for the [StaticAABB2DIndex].
     ///
     /// The node size is the maximum number of boxes stored as children of each node in the index tree.
-    #[inline(always)]
+    #[inline]
     pub fn node_size(&self) -> usize {
         self.node_size
     }
@@ -821,7 +826,7 @@ where
     /// Gets the level bounds for all the boxes in the [StaticAABB2DIndex].
     ///
     /// The level bounds are the index positions in [StaticAABB2DIndex::all_boxes] where a change in the level of the index tree occurs.
-    #[inline(always)]
+    #[inline]
     pub fn level_bounds(&self) -> &[usize] {
         &self.level_bounds
     }
@@ -831,7 +836,7 @@ where
     /// The boxes are ordered from the bottom of the tree up, so from 0 to [StaticAABB2DIndex::count] are all the item bounding boxes.
     /// Use [StaticAABB2DIndex::map_all_boxes_index] to map a box back to the original index position it was added or find the start
     /// position for the children of a node box.
-    #[inline(always)]
+    #[inline]
     pub fn all_boxes(&self) -> &[AABB<T>] {
         &self.boxes
     }
@@ -842,14 +847,14 @@ where
     /// If `all_boxes_index` is greater than [StaticAABB2DIndex::count] then it will return the
     /// [StaticAABB2DIndex::all_boxes] starting index of the node's children boxes.
     /// See the index_tree_structure.rs example for more information.
-    #[inline(always)]
+    #[inline]
     pub fn map_all_boxes_index(&self, all_boxes_index: usize) -> usize {
         self.indices[all_boxes_index]
     }
 
     /// Same as [StaticAABB2DIndex::query] but accepts an existing [Vec] to be used as a stack buffer when
     /// performing the query to avoid the need for allocation (this is for performance benefit only).
-    #[inline(always)]
+    #[inline]
     pub fn query_with_stack(
         &self,
         min_x: T,
