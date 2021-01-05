@@ -78,7 +78,7 @@ fn create_index_group(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_query(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
+fn bench_visit_query(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
     let mut query_results: Vec<usize> = Vec::new();
     let delta = 1.0;
     b.iter(|| {
@@ -116,7 +116,27 @@ fn bench_query_iter(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
     })
 }
 
-fn bench_query_reuse_stack(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
+fn bench_query_iter_reuse_stack(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
+    let mut query_results: Vec<usize> = Vec::new();
+    let mut stack = Vec::with_capacity(16);
+    let delta = 1.0;
+    b.iter(|| {
+        for b in index.item_boxes() {
+            query_results.clear();
+            for i in index.query_iter_with_stack(
+                b.min_x - delta,
+                b.min_y - delta,
+                b.max_x + delta,
+                b.max_y + delta,
+                &mut stack,
+            ) {
+                query_results.push(i);
+            }
+        }
+    })
+}
+
+fn bench_visit_query_reuse_stack(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
     let mut query_results: Vec<usize> = Vec::new();
     let mut stack = Vec::with_capacity(16);
     let delta = 1.0;
@@ -145,15 +165,20 @@ fn query_index_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("query_index");
     let item_counts = (5..6).map(|i| 100 * 2usize.pow(i));
     for i in item_counts {
-        group.bench_with_input(BenchmarkId::new("query", i), &i, |b, i| {
-            bench_query(b, &create_index_with_count(*i))
+        group.bench_with_input(BenchmarkId::new("visit_query", i), &i, |b, i| {
+            bench_visit_query(b, &create_index_with_count(*i))
         });
         group.bench_with_input(BenchmarkId::new("query_iter", i), &i, |b, i| {
             bench_query_iter(b, &create_index_with_count(*i))
         });
-        group.bench_with_input(BenchmarkId::new("query_reuse_stack", i), &i, |b, i| {
-            bench_query_reuse_stack(b, &create_index_with_count(*i))
+        group.bench_with_input(BenchmarkId::new("query_iter_reuse_stack", i), &i, |b, i| {
+            bench_query_iter_reuse_stack(b, &create_index_with_count(*i))
         });
+        group.bench_with_input(
+            BenchmarkId::new("visit_query_reuse_stack", i),
+            &i,
+            |b, i| bench_visit_query_reuse_stack(b, &create_index_with_count(*i)),
+        );
     }
 
     group.finish();

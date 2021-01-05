@@ -253,6 +253,32 @@ fn query_iter_with_many_levels() {
 }
 
 #[test]
+fn query_iter_with_stack() {
+    let index = create_test_index();
+    // start stack with some garbage to test it gets cleared before use
+    let mut stack = vec![7, 7, 7];
+    let mut results: Vec<usize> = index
+        .query_iter_with_stack(40, 40, 60, 60, &mut stack)
+        .collect();
+    results.sort();
+    let expected_indexes = vec![6, 29, 31, 75];
+    assert_eq!(results, expected_indexes);
+}
+
+#[test]
+fn query_iter_with_stack_with_many_levels() {
+    let index = create_index_with_node_size(&create_test_data(), 4);
+    // start stack with some garbage to test it gets cleared before use
+    let mut stack = vec![7, 7, 7];
+    let mut results: Vec<usize> = index
+        .query_iter_with_stack(40, 40, 60, 60, &mut stack)
+        .collect();
+    results.sort();
+    let expected_indexes = vec![6, 29, 31, 75];
+    assert_eq!(results, expected_indexes);
+}
+
+#[test]
 fn visit_query() {
     let index = create_test_index();
     let mut results = Vec::new();

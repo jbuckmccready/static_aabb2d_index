@@ -747,6 +747,110 @@ where
     }
 }
 
+struct QueryIteratorStackRef<'a, T>
+where
+    T: IndexableNum,
+{
+    aabb_index: &'a StaticAABB2DIndex<T>,
+    stack: &'a mut Vec<usize>,
+    min_x: T,
+    min_y: T,
+    max_x: T,
+    max_y: T,
+    node_index: usize,
+    level: usize,
+    pos: usize,
+    end: usize,
+}
+
+impl<'a, T> QueryIteratorStackRef<'a, T>
+where
+    T: IndexableNum,
+{
+    #[inline]
+    fn new(
+        aabb_index: &'a StaticAABB2DIndex<T>,
+        stack: &'a mut Vec<usize>,
+        min_x: T,
+        min_y: T,
+        max_x: T,
+        max_y: T,
+    ) -> QueryIteratorStackRef<'a, T> {
+        let node_index = aabb_index.boxes.len() - 1;
+        let pos = node_index;
+        let level = aabb_index.level_bounds.len() - 1;
+        let end = min(
+            node_index + aabb_index.node_size,
+            *get_at_index!(aabb_index.level_bounds, level),
+        );
+
+        // ensure the stack is empty for use
+        stack.clear();
+
+        QueryIteratorStackRef {
+            aabb_index,
+            stack,
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+            node_index,
+            level,
+            pos,
+            end,
+        }
+    }
+}
+
+impl<'a, T> Iterator for QueryIteratorStackRef<'a, T>
+where
+    T: IndexableNum,
+{
+    type Item = usize;
+
+    // NOTE: The inline attribute here shows significant performance improvements in benchmarks.
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            while self.pos < self.end {
+                let current_pos = self.pos;
+                self.pos += 1;
+
+                let aabb = get_at_index!(self.aabb_index.boxes, current_pos);
+                if !aabb.overlaps(self.min_x, self.min_y, self.max_x, self.max_y) {
+                    // no overlap
+                    continue;
+                }
+
+                let index = *get_at_index!(self.aabb_index.indices, current_pos);
+                if self.node_index < self.aabb_index.num_items {
+                    return Some(index);
+                } else {
+                    self.stack.push(index);
+                    self.stack.push(self.level - 1);
+                }
+            }
+
+            if self.stack.len() > 1 {
+                self.level = self.stack.pop().unwrap();
+                self.node_index = self.stack.pop().unwrap();
+                self.pos = self.node_index;
+                self.end = min(
+                    self.node_index + self.aabb_index.node_size,
+                    *get_at_index!(self.aabb_index.level_bounds, self.level),
+                );
+            } else {
+                return None;
+            }
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.aabb_index.num_items))
+    }
+}
+
 impl<T> StaticAABB2DIndex<T>
 where
     T: IndexableNum,
@@ -821,6 +925,19 @@ where
         max_y: T,
     ) -> impl Iterator<Item = usize> + 'a {
         QueryIterator::<'a, T>::new(&self, min_x, min_y, max_x, max_y)
+    }
+
+    /// The same as [StaticAABB2DIndex::query_iter] but allows using an existing buffer for stack traversal.
+    #[inline]
+    pub fn query_iter_with_stack<'a>(
+        &'a self,
+        min_x: T,
+        min_y: T,
+        max_x: T,
+        max_y: T,
+        stack: &'a mut Vec<usize>,
+    ) -> impl Iterator<Item = usize> + 'a {
+        QueryIteratorStackRef::<'a, T>::new(&self, stack, min_x, min_y, max_x, max_y)
     }
 
     /// Same as [StaticAABB2DIndex::query] but instead of returning a collection of indexes a `visitor`
