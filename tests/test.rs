@@ -66,7 +66,7 @@ fn create_small_test_index() -> StaticAABB2DIndex<i32> {
 #[test]
 fn building_from_zeroes_is_ok() {
     {
-        // f64 index
+        // f64 boxes
         let item_count = 50;
         let data = vec![0.0; item_count * 4];
         let index = create_index(&data);
@@ -79,7 +79,7 @@ fn building_from_zeroes_is_ok() {
         assert!(query_results.is_empty());
     }
     {
-        // i32 index
+        // i32 boxes
         let item_count = 50;
         let data = vec![0; item_count * 4];
         let index = create_index(&data);
@@ -94,6 +94,15 @@ fn building_from_zeroes_is_ok() {
 }
 
 #[test]
+fn building_with_zero_items_errors() {
+    let builder = StaticAABB2DIndexBuilder::<f64>::new(0);
+    assert!(matches!(
+        builder.build(),
+        Err(StaticAABB2DIndexBuildError::ZeroItemsError)
+    ));
+}
+
+#[test]
 fn building_from_too_few_items_errors() {
     let data = create_test_data();
     let mut builder = StaticAABB2DIndexBuilder::new(10);
@@ -101,13 +110,13 @@ fn building_from_too_few_items_errors() {
         builder.add(data[pos], data[pos + 1], data[pos + 2], data[pos + 3]);
     }
 
-    match builder.build() {
-        Err(StaticAABB2DIndexBuildError::ItemCountError { added, expected }) => {
-            assert_eq!(added, 9);
-            assert_eq!(expected, 10);
-        }
-        _ => assert!(false, "build result should have error"),
-    };
+    assert!(matches!(
+        builder.build(),
+        Err(StaticAABB2DIndexBuildError::ItemCountError {
+            added: 9,
+            expected: 10
+        })
+    ));
 }
 
 #[test]
@@ -118,13 +127,13 @@ fn building_from_too_many_items_errors() {
         builder.add(data[pos], data[pos + 1], data[pos + 2], data[pos + 3]);
     }
 
-    match builder.build() {
-        Err(StaticAABB2DIndexBuildError::ItemCountError { added, expected }) => {
-            assert_eq!(added, 20);
-            assert_eq!(expected, 10);
-        }
-        _ => assert!(false, "build result should have error"),
-    };
+    assert!(matches!(
+        builder.build(),
+        Err(StaticAABB2DIndexBuildError::ItemCountError {
+            added: 20,
+            expected: 10
+        })
+    ));
 }
 
 #[test]
@@ -269,6 +278,42 @@ fn visit_query_with_many_levels() {
     };
 
     index.visit_query(40, 40, 60, 60, &mut visitor);
+
+    results.sort();
+    let expected_indexes = vec![6, 29, 31, 75];
+    assert_eq!(results, expected_indexes);
+}
+
+#[test]
+fn visit_query_with_stack() {
+    let index = create_test_index();
+    // start stack with some garbage to test it gets cleared before use
+    let mut stack = vec![7, 7, 7];
+    let mut results = Vec::new();
+    let mut visitor = |i| {
+        results.push(i);
+        true
+    };
+
+    index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
+
+    results.sort();
+    let expected_indexes = vec![6, 29, 31, 75];
+    assert_eq!(results, expected_indexes);
+}
+
+#[test]
+fn visit_query_with_stack_with_many_levels() {
+    let index = create_index_with_node_size(&create_test_data(), 4);
+    // start stack with some garbage to test it gets cleared before use
+    let mut stack = vec![7, 7, 7];
+    let mut results = Vec::new();
+    let mut visitor = |i| {
+        results.push(i);
+        true
+    };
+
+    index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
 
     results.sort();
     let expected_indexes = vec![6, 29, 31, 75];

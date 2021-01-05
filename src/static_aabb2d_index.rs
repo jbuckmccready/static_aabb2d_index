@@ -27,6 +27,8 @@ pub trait IndexableNum: Copy + Num + PartialOrd + Default + Bounded + NumCast {
 }
 
 // impl for all supported built in types
+// note that other builtin primitive numbers are not supported
+// since the type must cast to/from u16 to be supported
 impl IndexableNum for u16 {}
 impl IndexableNum for i32 {}
 impl IndexableNum for u32 {}
@@ -40,6 +42,8 @@ impl IndexableNum for f64 {}
 /// Error type for errors that may be returned in attempting to build the index.
 #[derive(Debug, PartialEq)]
 pub enum StaticAABB2DIndexBuildError {
+    /// Error for the case when the item count given is 0.
+    ZeroItemsError,
     /// Error for the case when the number of items added does not match the size given at construction.
     ItemCountError {
         /// The number of items that were added.
@@ -56,6 +60,10 @@ impl std::error::Error for StaticAABB2DIndexBuildError {}
 impl fmt::Display for StaticAABB2DIndexBuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            StaticAABB2DIndexBuildError::ZeroItemsError => write!(
+                f,
+                "item count given cannot be zero"
+            ),
             StaticAABB2DIndexBuildError::ItemCountError {added, expected} => write!(
                 f,
                 "added item count should equal static size given to builder (added: {}, expected: {})", added, expected
@@ -275,6 +283,22 @@ where
     T: IndexableNum,
 {
     fn init(num_items: usize, node_size: usize) -> Self {
+        if num_items == 0 {
+            // just return early, build() method will return error result
+            return StaticAABB2DIndexBuilder {
+                min_x: T::max_value(),
+                min_y: T::max_value(),
+                max_x: T::min_value(),
+                max_y: T::min_value(),
+                node_size,
+                num_items,
+                level_bounds: Vec::new(),
+                boxes: Vec::new(),
+                indices: Vec::new(),
+                pos: 0,
+            };
+        }
+
         let node_size = min(max(node_size, 2), 65535);
 
         let mut n = num_items;
@@ -377,6 +401,10 @@ where
                 added: self.pos,
                 expected: self.num_items,
             });
+        }
+
+        if self.num_items == 0 {
+            return Err(StaticAABB2DIndexBuildError::ZeroItemsError);
         }
 
         // if number of items is less than node size then skip sorting since each node of boxes must be
