@@ -1032,6 +1032,7 @@ where
     {
         let mut node_index = self.boxes.len() - 1;
         let mut level = self.level_bounds.len() - 1;
+        // ensure the stack is empty for use
         stack.clear();
 
         'search_loop: loop {
