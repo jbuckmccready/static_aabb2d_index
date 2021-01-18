@@ -459,7 +459,7 @@ dependencies = [
 
 [[package]]
 name = "static_aabb2d_index"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "criterion",
  "num-traits",

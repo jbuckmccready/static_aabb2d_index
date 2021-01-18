@@ -1,13 +1,13 @@
 [package]
-name = "static_aabb2d_index"
-version = "0.3.0"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/jbuckmccready/static_aabb2d_index"
-description = "Fast static spatial index data structure for 2D axis aligned bounding boxes"
-keywords = ["algorithm", "2d", "computational", "geometry", "spatial"]
-categories = ["algorithms", "data-structures", "graphics", "mathematics"]
 authors = ["Buck McCready <jbuckmccready@gmail.com>"]
+categories = ["algorithms", "data-structures", "graphics", "mathematics"]
+description = "Fast static spatial index data structure for 2D axis aligned bounding boxes"
 edition = "2018"
+keywords = ["algorithm", "2d", "computational", "geometry", "spatial"]
+license = "MIT OR Apache-2.0"
+name = "static_aabb2d_index"
+repository = "https://github.com/jbuckmccready/static_aabb2d_index"
+version = "0.4.0"
 
 [features]
 # allows for some selective use of unsafe for performance gains
@@ -21,5 +21,5 @@ num-traits = "0.2.14"
 criterion = "0.3"
 
 [[bench]]
-name = "bench_static_aabb2d_index"
 harness = false
+name = "bench_static_aabb2d_index"
