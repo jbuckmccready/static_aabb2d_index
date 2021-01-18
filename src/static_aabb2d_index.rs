@@ -743,7 +743,13 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.aabb_index.num_items))
+        if self.pos >= self.end && self.stack.len() < 2 {
+            // iterator exhausted
+            (0, Some(0))
+        } else {
+            // never yields more than the number of items in the index
+            (0, Some(self.aabb_index.num_items))
+        }
     }
 }
 
@@ -847,7 +853,13 @@ where
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.aabb_index.num_items))
+        if self.pos >= self.end && self.stack.len() < 2 {
+            // iterator exhausted
+            (0, Some(0))
+        } else {
+            // never yields more than the number of items in the index
+            (0, Some(self.aabb_index.num_items))
+        }
     }
 }
 
