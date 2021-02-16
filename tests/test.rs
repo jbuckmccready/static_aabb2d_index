@@ -360,3 +360,75 @@ fn visit_query_stops_early() {
     let expected_superset_indexes: HashSet<usize> = [6, 29, 31, 75].iter().cloned().collect();
     assert!(results.is_subset(&expected_superset_indexes));
 }
+
+#[test]
+fn visit_neighbors_max_results() {
+    let index = create_test_index();
+    let mut results = Vec::new();
+    let max_results = 3;
+    let mut visitor = |i, _| {
+        results.push(i);
+        results.len() < max_results
+    };
+
+    index.visit_neighbors(50, 50, &mut visitor);
+    results.sort();
+    let expected_indexes = vec![6, 31, 75];
+    assert_eq!(results, expected_indexes);
+}
+
+#[test]
+fn visit_neighbors_max_distance() {
+    let index = create_test_index();
+    let mut results = Vec::new();
+    let max_distance = 12.0;
+    let max_distance_squared = max_distance * max_distance;
+    let mut visitor = |i, d| {
+        if (d as f64) < max_distance_squared {
+            results.push(i);
+            return true;
+        }
+        false
+    };
+
+    index.visit_neighbors(50, 50, &mut visitor);
+    results.sort();
+    let expected_indexes = vec![6, 29, 31, 75, 85];
+    assert_eq!(results, expected_indexes);
+}
+
+#[test]
+fn visit_neighbors_max_results_filtered() {
+    let index = create_test_index();
+    let mut results = Vec::new();
+    let max_results = 6;
+    let mut visitor = |i, _| {
+        // filtering by only collecting indexes which are even
+        if i % 2 == 0 {
+            results.push(i);
+            return results.len() < max_results;
+        }
+        true
+    };
+
+    index.visit_neighbors(50, 50, &mut visitor);
+    results.sort();
+    let expected_indexes = vec![6, 16, 18, 24, 54, 80];
+    assert_eq!(results, expected_indexes);
+}
+
+#[test]
+fn visit_neighbors_all_items() {
+    let index = create_test_index();
+    let mut results = Vec::new();
+    let mut visitor = |i, _| {
+        results.push(i);
+        // visit all items by always returning true
+        true
+    };
+
+    index.visit_neighbors(50, 50, &mut visitor);
+    results.sort();
+    let expected_indexes = (0..index.count()).collect::<Vec<_>>();
+    assert_eq!(results, expected_indexes);
+}
