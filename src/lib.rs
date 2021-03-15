@@ -1,7 +1,9 @@
-//! This crate implements a static/fixed size indexing data structure for two dimensional axis aligned bounding boxes.
-//! The index allows for fast construction and fast querying but cannot be modified after creation.
+//! This crate implements a static/fixed size indexing data structure for two dimensional axis
+//! aligned bounding boxes. The index allows for fast construction and fast querying but cannot be
+//! modified after creation.
 //!
-//! 2D axis aligned bounding boxes are represented by two extent points (four values): (min_x, min_y), (max_x, max_y).
+//! 2D axis aligned bounding boxes are represented by two extent points (four values):
+//! (min_x, min_y), (max_x, max_y).
 //!
 //! This is a port of the [flatbush](https://github.com/mourner/flatbush) javascript library.
 //!
@@ -37,5 +39,7 @@
 //! assert_eq!(visited_results, vec![1]);
 //! ```
 extern crate num_traits;
+mod core;
 mod static_aabb2d_index;
+pub use crate::core::*;
 pub use crate::static_aabb2d_index::*;
