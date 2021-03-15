@@ -1050,7 +1050,7 @@ where
     where
         F: FnMut(usize, T) -> bool,
     {
-        let mut queue = NeighborPriorityQueue::with_capacity(self.boxes.len());
+        let mut queue = NeighborPriorityQueue::new();
         self.visit_neighbors_with_queue(x, y, visitor, &mut queue);
     }
 
