@@ -1,7 +1,7 @@
 use num_traits::{Bounded, Num, NumCast};
 
-/// Trait used by the [StaticAABB2DIndex] that is required to be implemented for type T.
-/// It is blanket implemented for all primitive numeric types.
+/// Trait used by the [StaticAABB2DIndex](crate::StaticAABB2DIndex) that is required to be
+/// implemented for type T. It is blanket implemented for all supported primitive numeric types.
 pub trait IndexableNum: Copy + Num + PartialOrd + Default + Bounded + NumCast {
     /// Simple default min implementation for [PartialOrd] types.
     #[inline]
