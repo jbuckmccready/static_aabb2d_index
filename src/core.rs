@@ -38,6 +38,7 @@ impl IndexableNum for f32 {}
 impl IndexableNum for f64 {}
 
 /// Simple 2D axis aligned bounding box which holds the extents of a 2D box.
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct AABB<T = f64> {
     /// Min x extent of the axis aligned bounding box.
@@ -131,4 +132,122 @@ where
     pub fn contains(&self, min_x: T, min_y: T, max_x: T, max_y: T) -> bool {
         self.min_x <= min_x && self.min_y <= min_y && self.max_x >= max_x && self.max_y >= max_y
     }
+}
+
+/// Basic control flow enum that can be used when visiting query results.
+#[derive(Debug)]
+pub enum Control<B> {
+    /// Indicates to the query function to continue visiting results.
+    Continue,
+    /// Indicates to the query function to stop visiting results and return a value.
+    Break(B),
+}
+
+impl<B> Default for Control<B> {
+    fn default() -> Self {
+        Control::Continue
+    }
+}
+
+/// Trait for control flow inside query functions.
+pub trait ControlFlow {
+    /// Constructs state indicating to continue.
+    fn continuing() -> Self;
+    /// Should return true if control flow should break.
+    fn should_break(&self) -> bool;
+}
+
+impl<B> ControlFlow for Control<B> {
+    #[inline]
+    fn continuing() -> Self {
+        Control::Continue
+    }
+
+    #[inline]
+    fn should_break(&self) -> bool {
+        matches!(*self, Control::Break(_))
+    }
+}
+
+impl ControlFlow for () {
+    #[inline]
+    fn continuing() -> Self {}
+
+    #[inline]
+    fn should_break(&self) -> bool {
+        false
+    }
+}
+
+impl<C, E> ControlFlow for Result<C, E>
+where
+    C: ControlFlow,
+{
+    fn continuing() -> Self {
+        Ok(C::continuing())
+    }
+
+    fn should_break(&self) -> bool {
+        matches!(self, Err(_))
+    }
+}
+
+/// Visitor trait used to visit the results of a StaticAABB2DIndex query.
+///
+/// This trait is blanket implemented for FnMut(usize) -> impl ControlFlow.
+pub trait QueryVisitor<T, C>
+where
+    T: IndexableNum,
+    C: ControlFlow,
+{
+    /// Visit the index position of AABB returned by query.
+    fn visit(&mut self, index_pos: usize) -> C;
+}
+
+impl<T, C, F> QueryVisitor<T, C> for F
+where
+    T: IndexableNum,
+    C: ControlFlow,
+    F: FnMut(usize) -> C,
+{
+    #[inline]
+    fn visit(&mut self, index_pos: usize) -> C {
+        self(index_pos)
+    }
+}
+
+/// Visitor trait used to visit the results of a StaticAABB2DIndex nearest neighbors query.
+pub trait NeighborVisitor<T, C>
+where
+    T: IndexableNum,
+    C: ControlFlow,
+{
+    /// Visits the result containing the index position of the AABB neighbor and its euclidean
+    /// distance squared to the nearest neighbor input.
+    fn visit(&mut self, index_pos: usize, dist_squared: T) -> C;
+}
+
+impl<T, C, F> NeighborVisitor<T, C> for F
+where
+    T: IndexableNum,
+    C: ControlFlow,
+    F: FnMut(usize, T) -> C,
+{
+    #[inline]
+    fn visit(&mut self, index_pos: usize, dist_squared: T) -> C {
+        self(index_pos, dist_squared)
+    }
+}
+
+#[macro_export]
+macro_rules! try_control {
+    ($e:expr) => {
+        match $e {
+            x => {
+                if x.should_break() {
+                    return x;
+                }
+            }
+        }
+    };
 }

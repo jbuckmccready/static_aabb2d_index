@@ -284,7 +284,6 @@ fn visit_query() {
     let mut results = Vec::new();
     let mut visitor = |i| {
         results.push(i);
-        true
     };
 
     index.visit_query(40, 40, 60, 60, &mut visitor);
@@ -300,7 +299,6 @@ fn visit_query_with_many_levels() {
     let mut results = Vec::new();
     let mut visitor = |i| {
         results.push(i);
-        true
     };
 
     index.visit_query(40, 40, 60, 60, &mut visitor);
@@ -318,7 +316,6 @@ fn visit_query_with_stack() {
     let mut results = Vec::new();
     let mut visitor = |i| {
         results.push(i);
-        true
     };
 
     index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
@@ -336,7 +333,6 @@ fn visit_query_with_stack_with_many_levels() {
     let mut results = Vec::new();
     let mut visitor = |i| {
         results.push(i);
-        true
     };
 
     index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
@@ -352,7 +348,11 @@ fn visit_query_stops_early() {
     let mut results = HashSet::new();
     let mut visitor = |i| {
         results.insert(i);
-        results.len() != 2
+        if results.len() != 2 {
+            Control::Continue
+        } else {
+            Control::Break(())
+        }
     };
 
     index.visit_query(40, 40, 60, 60, &mut visitor);
@@ -368,7 +368,11 @@ fn visit_neighbors_max_results() {
     let max_results = 3;
     let mut visitor = |i, _| {
         results.push(i);
-        results.len() < max_results
+        if results.len() < max_results {
+            Control::Continue
+        } else {
+            Control::Break(())
+        }
     };
 
     index.visit_neighbors(50, 50, &mut visitor);
@@ -386,9 +390,9 @@ fn visit_neighbors_max_distance() {
     let mut visitor = |i, d| {
         if (d as f64) < max_distance_squared {
             results.push(i);
-            return true;
+            return Control::Continue;
         }
-        false
+        Control::Break(())
     };
 
     index.visit_neighbors(50, 50, &mut visitor);
@@ -406,9 +410,13 @@ fn visit_neighbors_max_results_filtered() {
         // filtering by only collecting indexes which are even
         if i % 2 == 0 {
             results.push(i);
-            return results.len() < max_results;
+            if results.len() < max_results {
+                return Control::Continue;
+            }
+
+            return Control::Break(());
         }
-        true
+        Control::Continue
     };
 
     index.visit_neighbors(50, 50, &mut visitor);
@@ -423,8 +431,6 @@ fn visit_neighbors_all_items() {
     let mut results = Vec::new();
     let mut visitor = |i, _| {
         results.push(i);
-        // visit all items by always returning true
-        true
     };
 
     index.visit_neighbors(50, 50, &mut visitor);

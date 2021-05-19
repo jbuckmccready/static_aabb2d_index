@@ -91,7 +91,6 @@ fn bench_visit_query(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
                 b.max_y + delta,
                 &mut |index: usize| {
                     query_results.push(index);
-                    true
                 },
             );
         }
@@ -150,7 +149,6 @@ fn bench_visit_query_reuse_stack(b: &mut Bencher, index: &StaticAABB2DIndex<f64>
                 b.max_y + delta,
                 &mut |index: usize| {
                     query_results.push(index);
-                    true
                 },
                 &mut stack,
             );

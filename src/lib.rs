@@ -29,10 +29,10 @@
 //! assert_eq!(query_results, vec![1]);
 //! // the query may also be done with a visiting function that can stop the query early
 //! let mut visited_results: Vec<usize> = Vec::new();
-//! let mut visitor = |box_added_pos: usize| -> bool {
+//! let mut visitor = |box_added_pos: usize| -> Control<()> {
 //!     visited_results.push(box_added_pos);
-//!     // return true to continue visiting results, false to stop early
-//!     true
+//!     // return continue to continue visiting results, break to stop early
+//!     Control::Continue
 //! };
 //!
 //! index.visit_query(-1.0, -1.0, -0.5, -0.5, &mut visitor);

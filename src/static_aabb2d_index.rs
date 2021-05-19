@@ -5,7 +5,7 @@ use std::{
     collections::BinaryHeap,
 };
 
-use crate::{IndexableNum, AABB};
+use crate::{try_control, ControlFlow, IndexableNum, NeighborVisitor, QueryVisitor, AABB};
 
 /// Error type for errors that may be returned in attempting to build the index.
 #[derive(Debug, PartialEq)]
@@ -98,10 +98,10 @@ where
 /// assert_eq!(query_results, vec![1]);
 /// // the query may also be done with a visiting function that can stop the query early
 /// let mut visited_results: Vec<usize> = Vec::new();
-/// let mut visitor = |box_added_pos: usize| -> bool {
+/// let mut visitor = |box_added_pos: usize| -> Control<()> {
 ///     visited_results.push(box_added_pos);
-///     // return true to continue visiting results, false to stop early
-///     true
+///     // return continue to continue visiting results, break to stop early
+///     Control::Continue
 /// };
 ///
 /// index.visit_query(-1.0, -1.0, -0.5, -0.5, &mut visitor);
@@ -180,9 +180,7 @@ where
 
         let mut n = num_items;
         let mut num_nodes = num_items;
-        let mut level_bounds: Vec<usize> = Vec::new();
-
-        level_bounds.push(n);
+        let mut level_bounds: Vec<usize> = vec![n];
 
         // calculate the total number of nodes in the R-tree to allocate space for
         // and the index of each tree level (level_bounds, used in search later)
@@ -851,7 +849,6 @@ where
         let mut results = Vec::new();
         let mut visitor = |i| {
             results.push(i);
-            true
         };
         self.visit_query(min_x, min_y, max_x, max_y, &mut visitor);
         results
@@ -900,11 +897,12 @@ where
 
     /// Same as [StaticAABB2DIndex::query] but instead of returning a collection of indexes a
     /// `visitor` function is called for each index that would be returned.  The `visitor` returns a
-    /// bool indicating whether to continue visiting (true) or not (false).
+    /// control flow indicating whether to continue visiting or break.
     #[inline]
-    pub fn visit_query<F>(&self, min_x: T, min_y: T, max_x: T, max_y: T, visitor: &mut F)
+    pub fn visit_query<V, C>(&self, min_x: T, min_y: T, max_x: T, max_y: T, visitor: &mut V)
     where
-        F: FnMut(usize) -> bool,
+        C: ControlFlow,
+        V: QueryVisitor<T, C>,
     {
         let mut stack: Vec<usize> = Vec::with_capacity(16);
         self.visit_query_with_stack(min_x, min_y, max_x, max_y, visitor, &mut stack);
@@ -974,7 +972,6 @@ where
         let mut results = Vec::new();
         let mut visitor = |i| {
             results.push(i);
-            true
         };
         self.visit_query_with_stack(min_x, min_y, max_x, max_y, &mut visitor, stack);
         results
@@ -983,23 +980,25 @@ where
     /// Same as [StaticAABB2DIndex::visit_query] but accepts an existing [Vec] to be used as a stack
     /// buffer when performing the query to avoid the need for allocation (this is for performance
     /// benefit only).
-    pub fn visit_query_with_stack<F>(
+    pub fn visit_query_with_stack<V, C>(
         &self,
         min_x: T,
         min_y: T,
         max_x: T,
         max_y: T,
-        visitor: &mut F,
+        visitor: &mut V,
         stack: &mut Vec<usize>,
-    ) where
-        F: FnMut(usize) -> bool,
+    ) -> C
+    where
+        C: ControlFlow,
+        V: QueryVisitor<T, C>,
     {
         let mut node_index = self.boxes.len() - 1;
         let mut level = self.level_bounds.len() - 1;
         // ensure the stack is empty for use
         stack.clear();
 
-        'search_loop: loop {
+        loop {
             let end = min(
                 node_index + self.node_size,
                 *get_at_index!(self.level_bounds, level),
@@ -1014,9 +1013,7 @@ where
 
                 let index = *get_at_index!(self.indices, pos);
                 if node_index < self.num_items {
-                    if !visitor(index) {
-                        break 'search_loop;
-                    }
+                    try_control!(visitor.visit(index))
                 } else {
                     stack.push(index);
                     stack.push(level - 1);
@@ -1027,17 +1024,16 @@ where
                 level = stack.pop().unwrap();
                 node_index = stack.pop().unwrap();
             } else {
-                break 'search_loop;
+                return C::continuing();
             }
         }
     }
 
     /// Visit all neighboring items in order of minimum euclidean distance to the point defined by
-    /// `x` and `y` until `visitor` returns false.
+    /// `x` and `y` until `visitor` breaks or all items have been visited.
     ///
     /// ## Notes
-    /// * The visitor function must return false to stop visiting items or all items will be
-    ///   visited.
+    /// * The visitor function must break to stop visiting items or all items will be visited.
     /// * The visitor function receives the index of the item being visited and the squared
     ///   euclidean distance to that item from the point given.
     /// * Because distances are squared (`dx * dx + dy * dy`) be cautious of smaller numeric types
@@ -1046,9 +1042,10 @@ where
     /// * If repeatedly calling this method then [StaticAABB2DIndex::visit_neighbors_with_queue] can
     ///   be used to avoid repeated allocations for the priority queue used internally.
     #[inline]
-    pub fn visit_neighbors<F>(&self, x: T, y: T, visitor: &mut F)
+    pub fn visit_neighbors<V, C>(&self, x: T, y: T, visitor: &mut V)
     where
-        F: FnMut(usize, T) -> bool,
+        C: ControlFlow,
+        V: NeighborVisitor<T, C>,
     {
         let mut queue = NeighborPriorityQueue::new();
         self.visit_neighbors_with_queue(x, y, visitor, &mut queue);
@@ -1056,14 +1053,16 @@ where
 
     /// Works the same as [StaticAABB2DIndex::visit_neighbors] but accepts an existing binary heap
     /// to be used as a priority queue to avoid allocations.
-    pub fn visit_neighbors_with_queue<F>(
+    pub fn visit_neighbors_with_queue<V, C>(
         &self,
         x: T,
         y: T,
-        visitor: &mut F,
+        visitor: &mut V,
         queue: &mut NeighborPriorityQueue<T>,
-    ) where
-        F: FnMut(usize, T) -> bool,
+    ) -> C
+    where
+        C: ControlFlow,
+        V: NeighborVisitor<T, C>,
     {
         // small helper function to compute axis distance between point and bounding box axis
         fn axis_dist<U>(k: U, min: U, max: U) -> U
@@ -1082,7 +1081,7 @@ where
         let mut node_index = self.boxes.len() - 1;
         queue.clear();
 
-        'search_loop: loop {
+        loop {
             let upper_bound_level_index = match self.level_bounds.binary_search(&node_index) {
                 // level bound found, add one to get upper bound
                 Ok(i) => i + 1,
@@ -1113,10 +1112,7 @@ where
             while let Some(state) = queue.pop() {
                 if state.is_leaf_node {
                     // visit leaf node
-                    if !visitor(state.index, state.dist) {
-                        // stop visiting if visitor returns false
-                        break 'search_loop;
-                    }
+                    try_control!(visitor.visit(state.index, state.dist))
                 } else {
                     // update node index for next iteration
                     node_index = state.index;
@@ -1127,7 +1123,7 @@ where
             }
 
             if !continue_search {
-                break 'search_loop;
+                return C::continuing();
             }
         }
     }
