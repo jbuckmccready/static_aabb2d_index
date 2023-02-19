@@ -186,9 +186,9 @@ fn many_tree_levels() {
     let all_boxes = index.all_boxes();
 
     // map_all_boxes_index should map back to original aabb index
-    for i in 0..index.count() {
+    for (i, curr_box) in all_boxes.iter().enumerate().take(index.count()) {
         let added_item_index = index.map_all_boxes_index(i);
-        assert_eq!(input_boxes[added_item_index], all_boxes[i]);
+        assert_eq!(&input_boxes[added_item_index], curr_box);
     }
 
     // map_all_boxes_index should get child start index
