@@ -38,6 +38,9 @@
 //! index.visit_query(-1.0, -1.0, -0.5, -0.5, &mut visitor);
 //! assert_eq!(visited_results, vec![1]);
 //! ```
+
+#![cfg_attr(not(feature = "unsafe_optimizations"), forbid(unsafe_code))]
+
 extern crate num_traits;
 mod core;
 mod static_aabb2d_index;

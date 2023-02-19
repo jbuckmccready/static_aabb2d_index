@@ -127,28 +127,28 @@ where
 }
 
 // get_at_index! and set_at_index! macros to toggle bounds checking at compile time
-#[cfg(not(feature = "allow_unsafe"))]
+#[cfg(not(feature = "unsafe_optimizations"))]
 macro_rules! get_at_index {
     ($container:expr, $index:expr) => {
         &$container[$index]
     };
 }
 
-#[cfg(feature = "allow_unsafe")]
+#[cfg(feature = "unsafe_optimizations")]
 macro_rules! get_at_index {
     ($container:expr, $index:expr) => {
         unsafe { $container.get_unchecked($index) }
     };
 }
 
-#[cfg(not(feature = "allow_unsafe"))]
+#[cfg(not(feature = "unsafe_optimizations"))]
 macro_rules! set_at_index {
     ($container:expr, $index:expr, $value:expr) => {
         $container[$index] = $value
     };
 }
 
-#[cfg(feature = "allow_unsafe")]
+#[cfg(feature = "unsafe_optimizations")]
 macro_rules! set_at_index {
     ($container:expr, $index:expr, $value:expr) => {
         unsafe { *$container.get_unchecked_mut($index) = $value }
@@ -195,7 +195,7 @@ where
 
         // unsafe alternative for performance (uninitialized memory rather than initialize to zero)
         // since it is all initialized later before use
-        #[cfg(feature = "allow_unsafe")]
+        #[cfg(feature = "unsafe_optimizations")]
         let init_boxes = || {
             let mut boxes = Vec::with_capacity(num_nodes);
             unsafe {
@@ -204,7 +204,7 @@ where
             boxes
         };
 
-        #[cfg(not(feature = "allow_unsafe"))]
+        #[cfg(not(feature = "unsafe_optimizations"))]
         let init_boxes = || vec![AABB::default(); num_nodes];
 
         let boxes = init_boxes();

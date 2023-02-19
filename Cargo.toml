@@ -7,11 +7,11 @@ keywords = ["algorithm", "2d", "computational", "geometry", "spatial"]
 license = "MIT OR Apache-2.0"
 name = "static_aabb2d_index"
 repository = "https://github.com/jbuckmccready/static_aabb2d_index"
-version = "0.6.0"
+version = "0.7.0"
 
 [features]
 # allows for some selective use of unsafe for performance gains
-allow_unsafe = []
+unsafe_optimizations = []
 
 [dependencies]
 num-traits = "0.2"
