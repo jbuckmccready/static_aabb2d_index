@@ -7,6 +7,9 @@
 //!
 //! This is a port of the [flatbush](https://github.com/mourner/flatbush) javascript library.
 //!
+//! By default no unsafe code is used (`#![forbid(unsafe_code)]` is applied). Some unsafe
+//! optimizations can be enabled by toggling on the `unsafe_optimizations` flag.
+//!
 //! # Examples
 //! ```
 //! use static_aabb2d_index::*;
