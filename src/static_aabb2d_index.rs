@@ -768,6 +768,7 @@ impl<T> NeighborsState<T>
 where
     T: IndexableNum,
 {
+    #[inline]
     fn new(index: usize, is_leaf_node: bool, dist: T) -> Self {
         NeighborsState {
             index,
@@ -783,13 +784,11 @@ impl<T> Ord for NeighborsState<T>
 where
     T: IndexableNum,
 {
+    #[inline]
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if let Some(ord) = self.partial_cmp(other) {
-            ord
-        } else {
-            // if ordering not possible (due to NAN) then just consider equal
-            std::cmp::Ordering::Equal
-        }
+        // flip ordering (compare other to self rather than self to other) to prioritize minimum
+        // dist in priority queue
+        other.dist.total_cmp(&self.dist)
     }
 }
 
@@ -797,10 +796,9 @@ impl<T> PartialOrd for NeighborsState<T>
 where
     T: IndexableNum,
 {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // flip ordering (compare other to self rather than self to other) to prioritize minimum
-        // dist in priority queue
-        other.dist.partial_cmp(&self.dist)
+        Some(self.cmp(other))
     }
 }
 

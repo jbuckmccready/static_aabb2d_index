@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use num_traits::{Bounded, Num, NumCast};
 
 /// Trait used by the [StaticAABB2DIndex](crate::StaticAABB2DIndex) that is required to be
@@ -22,20 +24,70 @@ pub trait IndexableNum: Copy + Num + PartialOrd + Default + Bounded + NumCast {
 
         other
     }
+
+    /// Total comparison between numbers. For types which implement [Ord] this should just use the
+    /// [Ord::cmp] method. For [f32] and [f64] types the `f32::total_cmp` and `f64::total_cmp`
+    /// methods are used.
+    fn total_cmp(&self, other: &Self) -> Ordering;
+}
+
+macro_rules! impl_indexable_num_for_ord_type {
+    ($t:ty) => {
+        impl IndexableNum for $t {
+            #[inline]
+            fn min(self, other: Self) -> Self {
+                std::cmp::min(self, other)
+            }
+            #[inline]
+            fn max(self, other: Self) -> Self {
+                std::cmp::max(self, other)
+            }
+            #[inline]
+            fn total_cmp(&self, other: &Self) -> Ordering {
+                self.cmp(other)
+            }
+        }
+    };
 }
 
 // impl for all supported built in types
 // note that other builtin primitive numbers are not supported
 // since the type must cast to/from u16 to be supported
-impl IndexableNum for u16 {}
-impl IndexableNum for i32 {}
-impl IndexableNum for u32 {}
-impl IndexableNum for i64 {}
-impl IndexableNum for u64 {}
-impl IndexableNum for i128 {}
-impl IndexableNum for u128 {}
-impl IndexableNum for f32 {}
-impl IndexableNum for f64 {}
+impl_indexable_num_for_ord_type!(u16);
+impl_indexable_num_for_ord_type!(i32);
+impl_indexable_num_for_ord_type!(u32);
+impl_indexable_num_for_ord_type!(i64);
+impl_indexable_num_for_ord_type!(u64);
+impl_indexable_num_for_ord_type!(i128);
+impl_indexable_num_for_ord_type!(u128);
+impl IndexableNum for f32 {
+    #[inline]
+    fn min(self, other: Self) -> Self {
+        self.min(other)
+    }
+    #[inline]
+    fn max(self, other: Self) -> Self {
+        self.max(other)
+    }
+    #[inline]
+    fn total_cmp(&self, other: &Self) -> Ordering {
+        self.total_cmp(other)
+    }
+}
+impl IndexableNum for f64 {
+    #[inline]
+    fn min(self, other: Self) -> Self {
+        self.min(other)
+    }
+    #[inline]
+    fn max(self, other: Self) -> Self {
+        self.max(other)
+    }
+    #[inline]
+    fn total_cmp(&self, other: &Self) -> Ordering {
+        self.total_cmp(other)
+    }
+}
 
 /// Simple 2D axis aligned bounding box which holds the extents of a 2D box.
 #[allow(clippy::upper_case_acronyms)]
