@@ -516,13 +516,8 @@ fn sort<T>(
 }
 
 #[inline]
-fn swap<T>(
-    values: &mut Vec<u32>,
-    boxes: &mut Vec<AABB<T>>,
-    indices: &mut Vec<usize>,
-    i: usize,
-    j: usize,
-) where
+fn swap<T>(values: &mut [u32], boxes: &mut [AABB<T>], indices: &mut [usize], i: usize, j: usize)
+where
     T: IndexableNum,
 {
     values.swap(i, j);
@@ -876,7 +871,7 @@ where
         max_x: T,
         max_y: T,
     ) -> impl Iterator<Item = usize> + 'a {
-        QueryIterator::<'a, T>::new(&self, min_x, min_y, max_x, max_y)
+        QueryIterator::<'a, T>::new(self, min_x, min_y, max_x, max_y)
     }
 
     /// The same as [StaticAABB2DIndex::query_iter] but allows using an existing buffer for stack
@@ -890,7 +885,7 @@ where
         max_y: T,
         stack: &'a mut Vec<usize>,
     ) -> impl Iterator<Item = usize> + 'a {
-        QueryIteratorStackRef::<'a, T>::new(&self, stack, min_x, min_y, max_x, max_y)
+        QueryIteratorStackRef::<'a, T>::new(self, stack, min_x, min_y, max_x, max_y)
     }
 
     /// Same as [StaticAABB2DIndex::query] but instead of returning a collection of indexes a
