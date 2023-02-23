@@ -126,33 +126,31 @@ where
     indices: Vec<usize>,
 }
 
-// get_at_index! and set_at_index! macros to toggle bounds checking at compile time
+// get_at_index and set_at_index helper functions to toggle bounds checking at compile time
 #[cfg(not(feature = "unsafe_optimizations"))]
-macro_rules! get_at_index {
-    ($container:expr, $index:expr) => {
-        &$container[$index]
-    };
+#[inline(always)]
+fn get_at_index<T>(container: &[T], index: usize) -> &T {
+    &container[index]
 }
 
 #[cfg(feature = "unsafe_optimizations")]
-macro_rules! get_at_index {
-    ($container:expr, $index:expr) => {
-        unsafe { $container.get_unchecked($index) }
-    };
+#[inline(always)]
+fn get_at_index<T>(container: &[T], index: usize) -> &T {
+    unsafe { container.get_unchecked(index) }
 }
 
 #[cfg(not(feature = "unsafe_optimizations"))]
-macro_rules! set_at_index {
-    ($container:expr, $index:expr, $value:expr) => {
-        $container[$index] = $value
-    };
+#[inline(always)]
+fn set_at_index<T>(container: &mut [T], index: usize, value: T) {
+    container[index] = value;
 }
 
 #[cfg(feature = "unsafe_optimizations")]
-macro_rules! set_at_index {
-    ($container:expr, $index:expr, $value:expr) => {
-        unsafe { *$container.get_unchecked_mut($index) = $value }
-    };
+#[inline(always)]
+fn set_at_index<T>(container: &mut [T], index: usize, value: T) {
+    unsafe {
+        *container.get_unchecked_mut(index) = value;
+    }
 }
 
 impl<T> StaticAABB2DIndexBuilder<T>
@@ -193,21 +191,7 @@ where
             }
         }
 
-        // unsafe alternative for performance (uninitialized memory rather than initialize to zero)
-        // since it is all initialized later before use
-        #[cfg(feature = "unsafe_optimizations")]
-        let init_boxes = || {
-            let mut boxes = Vec::with_capacity(num_nodes);
-            unsafe {
-                boxes.set_len(num_nodes);
-            }
-            boxes
-        };
-
-        #[cfg(not(feature = "unsafe_optimizations"))]
-        let init_boxes = || vec![AABB::default(); num_nodes];
-
-        let boxes = init_boxes();
+        let boxes = vec![AABB::default(); num_nodes];
 
         StaticAABB2DIndexBuilder {
             min_x: T::max_value(),
@@ -259,7 +243,11 @@ where
         debug_assert!(min_x <= max_x);
         debug_assert!(min_y <= max_y);
 
-        set_at_index!(self.boxes, self.pos, AABB::new(min_x, min_y, max_x, max_y));
+        set_at_index(
+            &mut self.boxes,
+            self.pos,
+            AABB::new(min_x, min_y, max_x, max_y),
+        );
         self.pos += 1;
 
         self.min_x = T::min(self.min_x, min_x);
@@ -291,12 +279,12 @@ where
         // if number of items is less than node size then skip sorting since each node of boxes must
         // be fully scanned regardless and there is only one node
         if self.num_items <= self.node_size {
-            set_at_index!(self.indices, self.pos, 0);
+            set_at_index(&mut self.indices, self.pos, 0);
             // fill root box with total extents
-            set_at_index!(
-                self.boxes,
+            set_at_index(
+                &mut self.boxes,
                 self.pos,
-                AABB::new(self.min_x, self.min_y, self.max_x, self.max_y)
+                AABB::new(self.min_x, self.min_y, self.max_x, self.max_y),
             );
             return Ok(StaticAABB2DIndex {
                 min_x: self.min_x,
@@ -354,7 +342,7 @@ where
         // generate nodes at each tree level, bottom-up
         let mut pos = 0;
         for i in 0..self.level_bounds.len() - 1 {
-            let end = *get_at_index!(self.level_bounds, i);
+            let end = *get_at_index(&self.level_bounds, i);
 
             // generate a parent node for each block of consecutive node_size nodes
             while pos < end {
@@ -367,7 +355,7 @@ where
                 // calculate bounding box for the new node
                 let mut j = 0;
                 while j < self.node_size && pos < end {
-                    let aabb = get_at_index!(self.boxes, pos);
+                    let aabb = get_at_index(&self.boxes, pos);
                     pos += 1;
                     node_min_x = T::min(node_min_x, aabb.min_x);
                     node_min_y = T::min(node_min_y, aabb.min_y);
@@ -377,11 +365,11 @@ where
                 }
 
                 // add the new node to the tree
-                set_at_index!(self.indices, self.pos, node_index);
-                set_at_index!(
-                    self.boxes,
+                set_at_index(&mut self.indices, self.pos, node_index);
+                set_at_index(
+                    &mut self.boxes,
                     self.pos,
-                    AABB::new(node_min_x, node_min_y, node_max_x, node_max_y)
+                    AABB::new(node_min_x, node_min_y, node_max_x, node_max_y),
                 );
                 self.pos += 1;
             }
@@ -468,9 +456,9 @@ pub fn hilbert_xy_to_index(x: u16, y: u16) -> u32 {
 
 // modified quick sort that skips sorting boxes within the same node
 fn sort<T>(
-    values: &mut Vec<u32>,
-    boxes: &mut Vec<AABB<T>>,
-    indices: &mut Vec<usize>,
+    values: &mut [u32],
+    boxes: &mut [AABB<T>],
+    indices: &mut [usize],
     left: usize,
     right: usize,
     node_size: usize,
@@ -485,21 +473,21 @@ fn sort<T>(
         return;
     }
 
-    let pivot = *get_at_index!(values, (left + right) >> 1);
+    let pivot = *get_at_index(values, (left + right) >> 1);
     let mut i = left.wrapping_sub(1);
     let mut j = right.wrapping_add(1);
 
     loop {
         loop {
             i = i.wrapping_add(1);
-            if *get_at_index!(values, i) >= pivot {
+            if *get_at_index(values, i) >= pivot {
                 break;
             }
         }
 
         loop {
             j = j.wrapping_sub(1);
-            if *get_at_index!(values, j) <= pivot {
+            if *get_at_index(values, j) <= pivot {
                 break;
             }
         }
@@ -558,7 +546,7 @@ where
         let level = aabb_index.level_bounds.len() - 1;
         let end = min(
             node_index + aabb_index.node_size,
-            *get_at_index!(aabb_index.level_bounds, level),
+            *get_at_index(&aabb_index.level_bounds, level),
         );
         QueryIterator {
             aabb_index,
@@ -589,13 +577,13 @@ where
                 let current_pos = self.pos;
                 self.pos += 1;
 
-                let aabb = get_at_index!(self.aabb_index.boxes, current_pos);
+                let aabb = get_at_index(&self.aabb_index.boxes, current_pos);
                 if !aabb.overlaps(self.min_x, self.min_y, self.max_x, self.max_y) {
                     // no overlap
                     continue;
                 }
 
-                let index = *get_at_index!(self.aabb_index.indices, current_pos);
+                let index = *get_at_index(&self.aabb_index.indices, current_pos);
                 if self.node_index < self.aabb_index.num_items {
                     return Some(index);
                 } else {
@@ -610,7 +598,7 @@ where
                 self.pos = self.node_index;
                 self.end = min(
                     self.node_index + self.aabb_index.node_size,
-                    *get_at_index!(self.aabb_index.level_bounds, self.level),
+                    *get_at_index(&self.aabb_index.level_bounds, self.level),
                 );
             } else {
                 return None;
@@ -664,7 +652,7 @@ where
         let level = aabb_index.level_bounds.len() - 1;
         let end = min(
             node_index + aabb_index.node_size,
-            *get_at_index!(aabb_index.level_bounds, level),
+            *get_at_index(&aabb_index.level_bounds, level),
         );
 
         // ensure the stack is empty for use
@@ -699,13 +687,13 @@ where
                 let current_pos = self.pos;
                 self.pos += 1;
 
-                let aabb = get_at_index!(self.aabb_index.boxes, current_pos);
+                let aabb = get_at_index(&self.aabb_index.boxes, current_pos);
                 if !aabb.overlaps(self.min_x, self.min_y, self.max_x, self.max_y) {
                     // no overlap
                     continue;
                 }
 
-                let index = *get_at_index!(self.aabb_index.indices, current_pos);
+                let index = *get_at_index(&self.aabb_index.indices, current_pos);
                 if self.node_index < self.aabb_index.num_items {
                     return Some(index);
                 } else {
@@ -720,7 +708,7 @@ where
                 self.pos = self.node_index;
                 self.end = min(
                     self.node_index + self.aabb_index.node_size,
-                    *get_at_index!(self.aabb_index.level_bounds, self.level),
+                    *get_at_index(&self.aabb_index.level_bounds, self.level),
                 );
             } else {
                 return None;
@@ -994,17 +982,17 @@ where
         loop {
             let end = min(
                 node_index + self.node_size,
-                *get_at_index!(self.level_bounds, level),
+                *get_at_index(&self.level_bounds, level),
             );
 
             for pos in node_index..end {
-                let aabb = get_at_index!(self.boxes, pos);
+                let aabb = get_at_index(&self.boxes, pos);
                 if !aabb.overlaps(min_x, min_y, max_x, max_y) {
                     // no overlap
                     continue;
                 }
 
-                let index = *get_at_index!(self.indices, pos);
+                let index = *get_at_index(&self.indices, pos);
                 if node_index < self.num_items {
                     try_control!(visitor.visit(index))
                 } else {
@@ -1091,11 +1079,11 @@ where
 
             // add nodes to queue
             for pos in node_index..end {
-                let aabb = get_at_index!(self.boxes, pos);
+                let aabb = get_at_index(&self.boxes, pos);
                 let dx = axis_dist(x, aabb.min_x, aabb.max_x);
                 let dy = axis_dist(y, aabb.min_y, aabb.max_y);
                 let dist = dx * dx + dy * dy;
-                let index = *get_at_index!(self.indices, pos);
+                let index = *get_at_index(&self.indices, pos);
                 let is_leaf_node = node_index < self.num_items;
                 queue.push(NeighborsState::new(index, is_leaf_node, dist));
             }

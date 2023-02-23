@@ -2,6 +2,18 @@
 
 All notable changes to the static_aabb2d_index crate will be documented in this file.
 
+## 0.7.1 - 2023-02-22
+
+### Changed
+
+- Removed unsafe optimization involving uninitialized memory, the code did not strictly uphold the
+  invariants required of a `Vec` at all times which could lead to undefined behavior. To properly
+  perform this optimization will require more pointer manipulation spread across the code or new
+  APIs from the Rust standard library. Index bounds checking is still toggled by the
+  `unsafe_optimizations` feature.
+- INTERNAL: replaced `get_at_index` and `set_at_index` macros with simple inlined functions and
+  simplified some function signatures to use slices rather than `Vec`.
+
 ## 0.7.0 - 2023-02-18
 
 ### Added ⭐
