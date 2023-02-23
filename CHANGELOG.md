@@ -4,7 +4,7 @@ All notable changes to the static_aabb2d_index crate will be documented in this 
 
 ## 0.7.1 - 2023-02-22
 
-### Changed
+### Changed 🔧
 
 - Removed unsafe optimization involving uninitialized memory, the code did not strictly uphold the
   invariants required of a `Vec` at all times which could lead to undefined behavior. To properly
