@@ -94,12 +94,34 @@ fn building_from_zeroes_is_ok() {
 }
 
 #[test]
-fn building_with_zero_items_errors() {
+fn zero_item_index_works() {
     let builder = StaticAABB2DIndexBuilder::<f64>::new(0);
-    assert!(matches!(
-        builder.build(),
-        Err(StaticAABB2DIndexBuildError::ZeroItemsError)
-    ));
+    let index = builder.build().expect("should build OK");
+    assert_eq!(index.count(), 0);
+    assert_eq!(index.bounds(), None);
+    let results: Vec<usize> = index.query(f64::MIN, f64::MIN, f64::MAX, f64::MAX);
+    assert_eq!(results, &[]);
+    let mut stack = Vec::new();
+    let results: Vec<usize> =
+        index.query_with_stack(f64::MIN, f64::MIN, f64::MAX, f64::MAX, &mut stack);
+    assert_eq!(results, &[]);
+
+    let iter_results: Vec<usize> = index
+        .query_iter(f64::MIN, f64::MIN, f64::MAX, f64::MAX)
+        .collect();
+    assert_eq!(iter_results, &[]);
+
+    let iter_results: Vec<usize> = index
+        .query_iter_with_stack(f64::MIN, f64::MIN, f64::MAX, f64::MAX, &mut stack)
+        .collect();
+    assert_eq!(iter_results, &[]);
+
+    let mut found_item = false;
+    index.visit_neighbors(0.0, 0.0, &mut |_, _| {
+        found_item = true;
+        Control::Break(())
+    });
+    assert!(!found_item);
 }
 
 #[test]
@@ -139,10 +161,14 @@ fn building_from_too_many_items_errors() {
 #[test]
 fn skip_sorting_small_index() {
     let index = create_small_test_index();
-    assert_eq!(index.min_x(), 0);
-    assert_eq!(index.min_y(), 2);
-    assert_eq!(index.max_x(), 96);
-    assert_eq!(index.max_y(), 93);
+    let total_bounds = index
+        .bounds()
+        .expect("items were added, bounds should exist");
+
+    assert_eq!(total_bounds.min_x, 0);
+    assert_eq!(total_bounds.min_y, 2);
+    assert_eq!(total_bounds.max_x, 96);
+    assert_eq!(total_bounds.max_y, 93);
 
     assert_eq!(index.level_bounds().len(), 2);
     assert_eq!(index.level_bounds(), vec![14, 15]);
@@ -166,7 +192,8 @@ fn skip_sorting_small_index() {
     ];
 
     let actual_item_boxes = index.item_boxes();
-    // note order should always match (should not be sorted differently from order added since num_items < node_size)
+    // note order should always match (should not be sorted differently from order added since
+    // num_items < node_size)
     assert_eq!(actual_item_boxes, &expected_item_boxes);
 }
 
@@ -210,10 +237,13 @@ fn many_tree_levels() {
 #[test]
 fn total_extents() {
     let index = create_test_index();
-    assert_eq!(index.min_x(), 0);
-    assert_eq!(index.min_y(), 1);
-    assert_eq!(index.max_x(), 96);
-    assert_eq!(index.max_y(), 95);
+    let total_bounds = index
+        .bounds()
+        .expect("items were added, bounds should exist");
+    assert_eq!(total_bounds.min_x, 0);
+    assert_eq!(total_bounds.min_y, 1);
+    assert_eq!(total_bounds.max_x, 96);
+    assert_eq!(total_bounds.max_y, 95);
 }
 
 #[test]

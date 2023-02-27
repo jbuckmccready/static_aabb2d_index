@@ -23,3 +23,7 @@ criterion = "0.4"
 [[bench]]
 harness = false
 name = "bench_static_aabb2d_index"
+
+[lib]
+# eliminate issues with criterion command line args, see: https://bheisler.github.io/criterion.rs/book/faq.html
+bench = false

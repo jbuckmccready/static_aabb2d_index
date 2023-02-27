@@ -8,7 +8,7 @@ const TAU: f64 = 2f64 * PI;
 
 struct Point(f64, f64);
 
-fn create_points(count: usize) -> Vec<Point> {
+fn create_points_on_circle(count: usize) -> Vec<Point> {
     let mut result: Vec<Point> = Vec::with_capacity(count);
 
     for i in 0..count {
@@ -24,7 +24,7 @@ fn create_points(count: usize) -> Vec<Point> {
 #[derive(Debug)]
 struct BoundingBox(f64, f64, f64, f64);
 
-fn create_boxes(points: &Vec<Point>) -> Vec<BoundingBox> {
+fn create_boxes_from_point_pairs(points: &Vec<Point>) -> Vec<BoundingBox> {
     let mut result: Vec<BoundingBox> = Vec::new();
     for pts in points.windows(2) {
         match &pts {
@@ -68,10 +68,13 @@ fn bench_create_index(b: &mut Bencher, boxes: &[BoundingBox]) {
 
 fn create_index_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("create_index");
-    let item_counts = (6..7).map(|i| 100 * 2usize.pow(i));
+    let item_counts = [100, 1_000, 10_000, 100_000];
     for i in item_counts {
         group.bench_with_input(BenchmarkId::new("create_index", i), &i, |b, i| {
-            bench_create_index(b, &create_boxes(&create_points(*i)))
+            bench_create_index(
+                b,
+                &create_boxes_from_point_pairs(&create_points_on_circle(*i)),
+            )
         });
     }
 
@@ -158,10 +161,10 @@ fn bench_visit_query_reuse_stack(b: &mut Bencher, index: &StaticAABB2DIndex<f64>
 
 fn query_index_group(c: &mut Criterion) {
     fn create_index_with_count(i: usize) -> StaticAABB2DIndex<f64> {
-        index_from_boxes(&create_boxes(&create_points(i)))
+        index_from_boxes(&create_boxes_from_point_pairs(&create_points_on_circle(i)))
     }
     let mut group = c.benchmark_group("query_index");
-    let item_counts = (5..6).map(|i| 100 * 2usize.pow(i));
+    let item_counts = [100, 1_000, 10_000, 100_000];
     for i in item_counts {
         group.bench_with_input(BenchmarkId::new("visit_query", i), &i, |b, i| {
             bench_visit_query(b, &create_index_with_count(*i))

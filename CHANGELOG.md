@@ -2,6 +2,15 @@
 
 All notable changes to the static_aabb2d_index crate will be documented in this file.
 
+## Unreleased
+
+### Changed 🔧
+
+- ⚠️ BREAKING: Index now supports being empty (no longer errors when building the index if item
+  count is 0). When the index is empty all queries will yield no results.
+- ⚠️ BREAKING: `min_x`, `min_y`, `max_x`, and `max_y` functions on index replaced with single
+  `bounds` function which returns the total bounds as an `AABB` or `None` if index item count is 0.
+
 ## 0.7.1 - 2023-02-22
 
 ### Changed 🔧
@@ -18,7 +27,7 @@ All notable changes to the static_aabb2d_index crate will be documented in this 
 
 ### Added ⭐
 
-- BREAKING: Added `total_cmp` method to `IndexableNum` trait to eliminate using `partial_cmp` and
+- ⚠️ BREAKING: Added `total_cmp` method to `IndexableNum` trait to eliminate using `partial_cmp` and
   unwrap which can panic if NaN is present (was used for nearest neighbors query). If implementing
   `IndexableNum` for your own type you must implement `total_cmp` for your type).
 - Added `forbid(unsafe_code)` attribute to crate if `unsafe_optimizations` feature is not enabled.

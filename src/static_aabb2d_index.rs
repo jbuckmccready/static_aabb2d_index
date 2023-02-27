@@ -10,8 +10,6 @@ use crate::{try_control, ControlFlow, IndexableNum, NeighborVisitor, QueryVisito
 /// Error type for errors that may be returned in attempting to build the index.
 #[derive(Debug, PartialEq)]
 pub enum StaticAABB2DIndexBuildError {
-    /// Error for the case when the item count given is 0.
-    ZeroItemsError,
     /// Error for the case when the number of items added does not match the size given at
     /// construction.
     ItemCountError {
@@ -29,9 +27,6 @@ impl std::error::Error for StaticAABB2DIndexBuildError {}
 impl fmt::Display for StaticAABB2DIndexBuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            StaticAABB2DIndexBuildError::ZeroItemsError => {
-                write!(f, "item count given cannot be zero")
-            }
             StaticAABB2DIndexBuildError::ItemCountError { added, expected } => write!(
                 f,
                 "added item count should equal static size given to builder \
@@ -112,10 +107,6 @@ pub struct StaticAABB2DIndex<T = f64>
 where
     T: IndexableNum,
 {
-    min_x: T,
-    min_y: T,
-    max_x: T,
-    max_y: T,
     node_size: usize,
     num_items: usize,
     level_bounds: Vec<usize>,
@@ -159,7 +150,7 @@ where
 {
     fn init(num_items: usize, node_size: usize) -> Self {
         if num_items == 0 {
-            // just return early, build() method will return error result
+            // just return early, with no items added
             return StaticAABB2DIndexBuilder {
                 min_x: T::max_value(),
                 min_y: T::max_value(),
@@ -273,7 +264,13 @@ where
         }
 
         if self.num_items == 0 {
-            return Err(StaticAABB2DIndexBuildError::ZeroItemsError);
+            return Ok(StaticAABB2DIndex {
+                node_size: self.node_size,
+                num_items: self.num_items,
+                level_bounds: self.level_bounds,
+                boxes: self.boxes,
+                indices: self.indices,
+            });
         }
 
         // if number of items is less than node size then skip sorting since each node of boxes must
@@ -287,10 +284,6 @@ where
                 AABB::new(self.min_x, self.min_y, self.max_x, self.max_y),
             );
             return Ok(StaticAABB2DIndex {
-                min_x: self.min_x,
-                min_y: self.min_y,
-                max_x: self.max_x,
-                max_y: self.max_y,
                 node_size: self.node_size,
                 num_items: self.num_items,
                 level_bounds: self.level_bounds,
@@ -376,10 +369,6 @@ where
         }
 
         Ok(StaticAABB2DIndex {
-            min_x: self.min_x,
-            min_y: self.min_y,
-            max_x: self.max_x,
-            max_y: self.max_y,
             node_size: self.node_size,
             num_items: self.num_items,
             level_bounds: self.level_bounds,
@@ -541,6 +530,22 @@ where
         max_x: T,
         max_y: T,
     ) -> QueryIterator<'a, T> {
+        if aabb_index.num_items == 0 {
+            // empty index
+            return Self {
+                aabb_index,
+                stack: Vec::new(),
+                min_x,
+                min_y,
+                max_x,
+                max_y,
+                node_index: 0,
+                level: 0,
+                pos: 0,
+                end: 0,
+            };
+        }
+
         let node_index = aabb_index.boxes.len() - 1;
         let pos = node_index;
         let level = aabb_index.level_bounds.len() - 1;
@@ -548,7 +553,8 @@ where
             node_index + aabb_index.node_size,
             *get_at_index(&aabb_index.level_bounds, level),
         );
-        QueryIterator {
+
+        Self {
             aabb_index,
             stack: Vec::with_capacity(16),
             min_x,
@@ -572,6 +578,10 @@ where
     // NOTE: The inline attribute here shows significant performance improvements in benchmarks.
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
+        if self.aabb_index.num_items == 0 {
+            return None;
+        }
+
         loop {
             while self.pos < self.end {
                 let current_pos = self.pos;
@@ -601,9 +611,11 @@ where
                     *get_at_index(&self.aabb_index.level_bounds, self.level),
                 );
             } else {
-                return None;
+                break;
             }
         }
+
+        None
     }
 
     #[inline]
@@ -647,6 +659,22 @@ where
         max_x: T,
         max_y: T,
     ) -> QueryIteratorStackRef<'a, T> {
+        if aabb_index.num_items == 0 {
+            // empty index
+            return Self {
+                aabb_index,
+                stack,
+                min_x,
+                min_y,
+                max_x,
+                max_y,
+                node_index: 0,
+                level: 0,
+                pos: 0,
+                end: 0,
+            };
+        }
+
         let node_index = aabb_index.boxes.len() - 1;
         let pos = node_index;
         let level = aabb_index.level_bounds.len() - 1;
@@ -658,7 +686,7 @@ where
         // ensure the stack is empty for use
         stack.clear();
 
-        QueryIteratorStackRef {
+        Self {
             aabb_index,
             stack,
             min_x,
@@ -682,6 +710,10 @@ where
     // NOTE: The inline attribute here shows significant performance improvements in benchmarks.
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
+        if self.aabb_index.num_items == 0 {
+            return None;
+        }
+
         loop {
             while self.pos < self.end {
                 let current_pos = self.pos;
@@ -711,9 +743,11 @@ where
                     *get_at_index(&self.aabb_index.level_bounds, self.level),
                 );
             } else {
-                return None;
+                break;
             }
         }
+
+        None
     }
 
     #[inline]
@@ -789,28 +823,11 @@ impl<T> StaticAABB2DIndex<T>
 where
     T: IndexableNum,
 {
-    /// Gets the min_x extent value of the all the bounding boxes in the index.
+    /// Gets the total bounds of all the items that were added to the index or `None` if the index
+    /// had no items added in construction (item count is 0).
     #[inline]
-    pub fn min_x(&self) -> T {
-        self.min_x
-    }
-
-    /// Gets the min_y extent value of the all the bounding boxes in the index.
-    #[inline]
-    pub fn min_y(&self) -> T {
-        self.min_y
-    }
-
-    /// Gets the max_x extent value of the all the bounding boxes in the index.
-    #[inline]
-    pub fn max_x(&self) -> T {
-        self.max_x
-    }
-
-    /// Gets the max_y extent value of the all the bounding boxes in the index.
-    #[inline]
-    pub fn max_y(&self) -> T {
-        self.max_y
+    pub fn bounds(&self) -> Option<AABB<T>> {
+        self.boxes.last().copied()
     }
 
     /// Gets the total count of items that were added to the index.
@@ -885,6 +902,10 @@ where
         C: ControlFlow,
         V: QueryVisitor<T, C>,
     {
+        if self.num_items == 0 {
+            // empty index, return early since no results to visit (avoid allocating for stack)
+            return;
+        }
         let mut stack: Vec<usize> = Vec::with_capacity(16);
         self.visit_query_with_stack(min_x, min_y, max_x, max_y, visitor, &mut stack);
     }
@@ -961,7 +982,29 @@ where
     /// Same as [StaticAABB2DIndex::visit_query] but accepts an existing [Vec] to be used as a stack
     /// buffer when performing the query to avoid the need for allocation (this is for performance
     /// benefit only).
+    #[inline]
     pub fn visit_query_with_stack<V, C>(
+        &self,
+        min_x: T,
+        min_y: T,
+        max_x: T,
+        max_y: T,
+        visitor: &mut V,
+        stack: &mut Vec<usize>,
+    ) -> C
+    where
+        C: ControlFlow,
+        V: QueryVisitor<T, C>,
+    {
+        if self.num_items == 0 {
+            // empty index, return early since no results to visit
+            return C::continuing();
+        }
+        self.visit_query_with_stack_impl(min_x, min_y, max_x, max_y, visitor, stack)
+    }
+
+    // Implementation function which assumes self.num_items > 0 (for performance reasons).
+    fn visit_query_with_stack_impl<V, C>(
         &self,
         min_x: T,
         min_y: T,
@@ -1057,6 +1100,11 @@ where
             } else {
                 U::zero()
             }
+        }
+
+        if self.boxes.is_empty() {
+            // empty index, return early since no results to visit
+            return C::continuing();
         }
 
         let mut node_index = self.boxes.len() - 1;
