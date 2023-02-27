@@ -185,6 +185,69 @@ fn query_index_group(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_neighbors(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
+    let mut query_results = Vec::new();
+    let max_neighbors = 10;
+    b.iter(|| {
+        for b in index.item_boxes() {
+            query_results.clear();
+            index.visit_neighbors(b.min_x, b.min_y, &mut |index: usize, _| {
+                query_results.push(index);
+                if query_results.len() == max_neighbors {
+                    Control::Break(())
+                } else {
+                    Control::Continue
+                }
+            });
+        }
+    })
+}
+
+fn bench_neighbors_reuse_queue(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
+    let mut query_results = Vec::new();
+    let mut queue = NeighborPriorityQueue::new();
+    let max_neighbors = 10;
+    b.iter(|| {
+        for b in index.item_boxes() {
+            query_results.clear();
+            index.visit_neighbors_with_queue(
+                b.min_x,
+                b.min_y,
+                &mut |index: usize, _| {
+                    query_results.push(index);
+                    if query_results.len() == max_neighbors {
+                        Control::Break(())
+                    } else {
+                        Control::Continue
+                    }
+                },
+                &mut queue,
+            );
+        }
+    })
+}
+
+fn nearest_neighbors_group(c: &mut Criterion) {
+    let mut group = c.benchmark_group("nearest_neighbors");
+    let item_counts = [100, 1_000, 10_000, 100_000];
+    fn create_index_with_count(i: usize) -> StaticAABB2DIndex<f64> {
+        index_from_boxes(&create_boxes_from_point_pairs(&create_points_on_circle(i)))
+    }
+    for i in item_counts {
+        group.bench_with_input(BenchmarkId::new("visit_neighbors", i), &i, |b, i| {
+            bench_neighbors(b, &create_index_with_count(*i))
+        });
+        group.bench_with_input(
+            BenchmarkId::new("visit_neighbors_reuse_queue", i),
+            &i,
+            |b, i| bench_neighbors_reuse_queue(b, &create_index_with_count(*i)),
+        );
+    }
+
+    group.finish();
+}
+
 criterion_group!(create_index, create_index_group,);
 criterion_group!(query_index, query_index_group);
-criterion_main!(create_index, query_index);
+criterion_group!(nearest_neighbors, nearest_neighbors_group);
+criterion_main!(create_index, query_index, nearest_neighbors);
