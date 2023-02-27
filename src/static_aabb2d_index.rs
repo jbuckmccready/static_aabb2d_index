@@ -47,10 +47,6 @@ pub struct StaticAABB2DIndexBuilder<T = f64>
 where
     T: IndexableNum,
 {
-    min_x: T,
-    min_y: T,
-    max_x: T,
-    max_y: T,
     node_size: usize,
     num_items: usize,
     level_bounds: Vec<usize>,
@@ -152,10 +148,6 @@ where
         if num_items == 0 {
             // just return early, with no items added
             return StaticAABB2DIndexBuilder {
-                min_x: T::max_value(),
-                min_y: T::max_value(),
-                max_x: T::min_value(),
-                max_y: T::min_value(),
                 node_size,
                 num_items,
                 level_bounds: Vec::new(),
@@ -185,10 +177,6 @@ where
         let boxes = vec![AABB::default(); num_nodes];
 
         StaticAABB2DIndexBuilder {
-            min_x: T::max_value(),
-            min_y: T::max_value(),
-            max_x: T::min_value(),
-            max_y: T::min_value(),
             node_size,
             num_items,
             level_bounds,
@@ -240,11 +228,6 @@ where
             AABB::new(min_x, min_y, max_x, max_y),
         );
         self.pos += 1;
-
-        self.min_x = T::min(self.min_x, min_x);
-        self.min_y = T::min(self.min_y, min_y);
-        self.max_x = T::max(self.max_x, max_x);
-        self.max_y = T::max(self.max_y, max_y);
         self
     }
 
@@ -273,6 +256,21 @@ where
             });
         }
 
+        // calculate total bounds
+        let mut item_boxes_iter = self.boxes.iter().take(self.num_items);
+        // initialize values with first box
+        let first_box = item_boxes_iter.next().unwrap();
+        let mut min_x = first_box.min_x;
+        let mut min_y = first_box.min_y;
+        let mut max_x = first_box.max_x;
+        let mut max_y = first_box.max_y;
+        for item in item_boxes_iter {
+            min_x = min_x.min(item.min_x);
+            min_y = min_y.min(item.min_y);
+            max_x = max_x.max(item.max_x);
+            max_y = max_y.max(item.max_y);
+        }
+
         // if number of items is less than node size then skip sorting since each node of boxes must
         // be fully scanned regardless and there is only one node
         if self.num_items <= self.node_size {
@@ -281,7 +279,7 @@ where
             set_at_index(
                 &mut self.boxes,
                 self.pos,
-                AABB::new(self.min_x, self.min_y, self.max_x, self.max_y),
+                AABB::new(min_x, min_y, max_x, max_y),
             );
             return Ok(StaticAABB2DIndex {
                 node_size: self.node_size,
@@ -292,8 +290,8 @@ where
             });
         }
 
-        let width = self.max_x - self.min_x;
-        let height = self.max_y - self.min_y;
+        let width = max_x - min_x;
+        let height = max_y - min_y;
 
         // hilbert max input value for x and y
         let hilbert_max = T::from(u16::MAX).ok_or(StaticAABB2DIndexBuildError::NumericCastError)?;
@@ -308,14 +306,14 @@ where
             let x = if width == T::zero() {
                 0
             } else {
-                (hilbert_max * ((aabb.min_x + aabb.max_x) / two - self.min_x) / width)
+                (hilbert_max * ((aabb.min_x + aabb.max_x) / two - min_x) / width)
                     .to_u16()
                     .ok_or(StaticAABB2DIndexBuildError::NumericCastError)?
             };
             let y = if height == T::zero() {
                 0
             } else {
-                (hilbert_max * ((aabb.min_y + aabb.max_y) / two - self.min_y) / height)
+                (hilbert_max * ((aabb.min_y + aabb.max_y) / two - min_y) / height)
                     .to_u16()
                     .ok_or(StaticAABB2DIndexBuildError::NumericCastError)?
             };
