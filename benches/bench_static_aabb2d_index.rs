@@ -2,9 +2,9 @@ use criterion::{criterion_group, criterion_main, Bencher, BenchmarkId, Criterion
 
 use static_aabb2d_index::*;
 
-use std::f64::consts::PI;
+use std::f64::consts::TAU;
 const RADIUS: f64 = 100.0;
-const TAU: f64 = 2f64 * PI;
+const QUERY_COUNT: usize = 100;
 
 struct Point(f64, f64);
 
@@ -26,30 +26,30 @@ struct BoundingBox(f64, f64, f64, f64);
 
 fn create_boxes_from_point_pairs(points: &Vec<Point>) -> Vec<BoundingBox> {
     let mut result: Vec<BoundingBox> = Vec::new();
-    for pts in points.windows(2) {
-        match &pts {
-            &[pt1, pt2] => {
-                let (min_x, max_x) = {
-                    if pt1.0 < pt2.0 {
-                        (pt1.0, pt2.0)
-                    } else {
-                        (pt2.0, pt1.0)
-                    }
-                };
-
-                let (min_y, max_y) = {
-                    if pt1.1 < pt2.1 {
-                        (pt1.1, pt2.1)
-                    } else {
-                        (pt2.1, pt1.1)
-                    }
-                };
-
-                result.push(BoundingBox(min_x, min_y, max_x, max_y));
+    let mut add_box = |pt1: &Point, pt2: &Point| {
+        let (min_x, max_x) = {
+            if pt1.0 < pt2.0 {
+                (pt1.0, pt2.0)
+            } else {
+                (pt2.0, pt1.0)
             }
-            _ => unreachable!(),
-        }
+        };
+
+        let (min_y, max_y) = {
+            if pt1.1 < pt2.1 {
+                (pt1.1, pt2.1)
+            } else {
+                (pt2.1, pt1.1)
+            }
+        };
+
+        result.push(BoundingBox(min_x, min_y, max_x, max_y));
+    };
+    for pts in points.windows(2) {
+        add_box(&pts[0], &pts[1]);
     }
+    // push last pair
+    add_box(&points[points.len() - 1], &points[0]);
     result
 }
 
@@ -68,7 +68,7 @@ fn bench_create_index(b: &mut Bencher, boxes: &[BoundingBox]) {
 
 fn create_index_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("create_index");
-    let item_counts = [100, 1_000, 10_000, 100_000];
+    let item_counts = [100, 1_000, 10_000, 100_000, 1_000_000];
     for i in item_counts {
         group.bench_with_input(BenchmarkId::new("create_index", i), &i, |b, i| {
             bench_create_index(
@@ -84,8 +84,9 @@ fn create_index_group(c: &mut Criterion) {
 fn bench_visit_query(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
     let mut query_results: Vec<usize> = Vec::new();
     let delta = 1.0;
+    let step = index.count() / QUERY_COUNT;
     b.iter(|| {
-        for b in index.item_boxes() {
+        for b in index.item_boxes().iter().step_by(step) {
             query_results.clear();
             index.visit_query(
                 b.min_x - delta,
@@ -103,8 +104,9 @@ fn bench_visit_query(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
 fn bench_query_iter(b: &mut Bencher, index: &StaticAABB2DIndex<f64>) {
     let mut query_results: Vec<usize> = Vec::new();
     let delta = 1.0;
+    let step = index.count() / QUERY_COUNT;
     b.iter(|| {
-        for b in index.item_boxes() {
+        for b in index.item_boxes().iter().step_by(step) {
             query_results.clear();
             for i in index.query_iter(
                 b.min_x - delta,
@@ -122,8 +124,9 @@ fn bench_query_iter_reuse_stack(b: &mut Bencher, index: &StaticAABB2DIndex<f64>)
     let mut query_results: Vec<usize> = Vec::new();
     let mut stack = Vec::with_capacity(16);
     let delta = 1.0;
+    let step = index.count() / QUERY_COUNT;
     b.iter(|| {
-        for b in index.item_boxes() {
+        for b in index.item_boxes().iter().step_by(step) {
             query_results.clear();
             for i in index.query_iter_with_stack(
                 b.min_x - delta,
@@ -142,8 +145,9 @@ fn bench_visit_query_reuse_stack(b: &mut Bencher, index: &StaticAABB2DIndex<f64>
     let mut query_results: Vec<usize> = Vec::new();
     let mut stack = Vec::with_capacity(16);
     let delta = 1.0;
+    let step = index.count() / QUERY_COUNT;
     b.iter(|| {
-        for b in index.item_boxes() {
+        for b in index.item_boxes().iter().step_by(step) {
             query_results.clear();
             index.visit_query_with_stack(
                 b.min_x - delta,
@@ -164,7 +168,7 @@ fn query_index_group(c: &mut Criterion) {
         index_from_boxes(&create_boxes_from_point_pairs(&create_points_on_circle(i)))
     }
     let mut group = c.benchmark_group("query_index");
-    let item_counts = [100, 1_000, 10_000, 100_000];
+    let item_counts = [100, 1_000, 10_000, 100_000, 1_000_000];
     for i in item_counts {
         group.bench_with_input(BenchmarkId::new("visit_query", i), &i, |b, i| {
             bench_visit_query(b, &create_index_with_count(*i))
