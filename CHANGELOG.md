@@ -10,6 +10,10 @@ All notable changes to the static_aabb2d_index crate will be documented in this 
   count is 0). When the index is empty all queries will yield no results.
 - ⚠️ BREAKING: `min_x`, `min_y`, `max_x`, and `max_y` functions on index replaced with single
   `bounds` function which returns the total bounds as an `AABB` or `None` if index item count is 0.
+- ⚠️ BREAKING: fixed inconsistency in `visit_query` function to return break result the same as the
+  `visit_query_with_stack` function.
+- ⚠️ BREAKING: fixed inconsistency in `visit_neighbors` function to return break result the same as
+  the `visit_neighbors_with_queue` function.
 
 ## 0.7.1 - 2023-02-22
 

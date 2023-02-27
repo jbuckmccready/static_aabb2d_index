@@ -596,10 +596,10 @@ where
                 let index = *get_at_index(&self.aabb_index.indices, current_pos);
                 if self.node_index < self.aabb_index.num_items {
                     return Some(index);
-                } else {
-                    self.stack.push(index);
-                    self.stack.push(self.level - 1);
                 }
+
+                self.stack.push(index);
+                self.stack.push(self.level - 1);
             }
 
             if self.stack.len() > 1 {
@@ -728,10 +728,10 @@ where
                 let index = *get_at_index(&self.aabb_index.indices, current_pos);
                 if self.node_index < self.aabb_index.num_items {
                     return Some(index);
-                } else {
-                    self.stack.push(index);
-                    self.stack.push(self.level - 1);
                 }
+
+                self.stack.push(index);
+                self.stack.push(self.level - 1);
             }
 
             if self.stack.len() > 1 {
@@ -897,17 +897,17 @@ where
     /// `visitor` function is called for each index that would be returned.  The `visitor` returns a
     /// control flow indicating whether to continue visiting or break.
     #[inline]
-    pub fn visit_query<V, C>(&self, min_x: T, min_y: T, max_x: T, max_y: T, visitor: &mut V)
+    pub fn visit_query<V, C>(&self, min_x: T, min_y: T, max_x: T, max_y: T, visitor: &mut V) -> C
     where
         C: ControlFlow,
         V: QueryVisitor<T, C>,
     {
         if self.num_items == 0 {
             // empty index, return early since no results to visit (avoid allocating for stack)
-            return;
+            return C::continuing();
         }
         let mut stack: Vec<usize> = Vec::with_capacity(16);
-        self.visit_query_with_stack(min_x, min_y, max_x, max_y, visitor, &mut stack);
+        self.visit_query_with_stack_impl(min_x, min_y, max_x, max_y, visitor, &mut stack)
     }
 
     /// Returns all the item [AABB] that were added to the index by [StaticAABB2DIndexBuilder::add].
@@ -1003,7 +1003,8 @@ where
         self.visit_query_with_stack_impl(min_x, min_y, max_x, max_y, visitor, stack)
     }
 
-    // Implementation function which assumes self.num_items > 0 (for performance reasons).
+    // Implementation function which assumes self.num_items > 0 (for performance it helped to move
+    // the self.num_items == 0 check outside of this function).
     fn visit_query_with_stack_impl<V, C>(
         &self,
         min_x: T,
@@ -1066,17 +1067,22 @@ where
     /// * If repeatedly calling this method then [StaticAABB2DIndex::visit_neighbors_with_queue] can
     ///   be used to avoid repeated allocations for the priority queue used internally.
     #[inline]
-    pub fn visit_neighbors<V, C>(&self, x: T, y: T, visitor: &mut V)
+    pub fn visit_neighbors<V, C>(&self, x: T, y: T, visitor: &mut V) -> C
     where
         C: ControlFlow,
         V: NeighborVisitor<T, C>,
     {
-        let mut queue = NeighborPriorityQueue::new();
-        self.visit_neighbors_with_queue(x, y, visitor, &mut queue);
+        if self.num_items == 0 {
+            // empty index, return early since no results to visit
+            return C::continuing();
+        }
+        let mut queue = NeighborPriorityQueue::with_capacity(8);
+        self.visit_neighbors_with_queue_impl(x, y, visitor, &mut queue)
     }
 
     /// Works the same as [StaticAABB2DIndex::visit_neighbors] but accepts an existing binary heap
     /// to be used as a priority queue to avoid allocations.
+    #[inline]
     pub fn visit_neighbors_with_queue<V, C>(
         &self,
         x: T,
@@ -1088,7 +1094,29 @@ where
         C: ControlFlow,
         V: NeighborVisitor<T, C>,
     {
+        if self.num_items == 0 {
+            // empty index, return early since no results to visit
+            return C::continuing();
+        }
+
+        self.visit_neighbors_with_queue_impl(x, y, visitor, queue)
+    }
+
+    // Implementation function which assumes self.num_items > 0 (for performance it helped to move
+    // the self.num_items == 0 check outside of this function).
+    fn visit_neighbors_with_queue_impl<V, C>(
+        &self,
+        x: T,
+        y: T,
+        visitor: &mut V,
+        queue: &mut NeighborPriorityQueue<T>,
+    ) -> C
+    where
+        C: ControlFlow,
+        V: NeighborVisitor<T, C>,
+    {
         // small helper function to compute axis distance between point and bounding box axis
+        #[inline]
         fn axis_dist<U>(k: U, min: U, max: U) -> U
         where
             U: IndexableNum,
@@ -1100,11 +1128,6 @@ where
             } else {
                 U::zero()
             }
-        }
-
-        if self.boxes.is_empty() {
-            // empty index, return early since no results to visit
-            return C::continuing();
         }
 
         let mut node_index = self.boxes.len() - 1;

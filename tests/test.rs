@@ -314,9 +314,11 @@ fn visit_query() {
     let mut results = Vec::new();
     let mut visitor = |i| {
         results.push(i);
+        Control::<()>::Continue
     };
 
-    index.visit_query(40, 40, 60, 60, &mut visitor);
+    let break_value_result = index.visit_query(40, 40, 60, 60, &mut visitor);
+    assert!(matches!(break_value_result, Control::Continue));
 
     results.sort();
     let expected_indexes = vec![6, 29, 31, 75];
@@ -346,9 +348,11 @@ fn visit_query_with_stack() {
     let mut results = Vec::new();
     let mut visitor = |i| {
         results.push(i);
+        Control::<()>::Continue
     };
 
-    index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
+    let break_value_result = index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
+    assert!(matches!(break_value_result, Control::Continue));
 
     results.sort();
     let expected_indexes = vec![6, 29, 31, 75];
@@ -365,7 +369,8 @@ fn visit_query_with_stack_with_many_levels() {
         results.push(i);
     };
 
-    index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
+    let break_value_result = index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
+    assert!(matches!(break_value_result, ()));
 
     results.sort();
     let expected_indexes = vec![6, 29, 31, 75];
@@ -381,11 +386,12 @@ fn visit_query_stops_early() {
         if results.len() != 2 {
             Control::Continue
         } else {
-            Control::Break(())
+            Control::Break("test")
         }
     };
 
-    index.visit_query(40, 40, 60, 60, &mut visitor);
+    let break_value_result = index.visit_query(40, 40, 60, 60, &mut visitor);
+    assert!(matches!(break_value_result, Control::Break("test")));
     assert_eq!(results.len(), 2);
     let expected_superset_indexes: HashSet<usize> = [6, 29, 31, 75].iter().cloned().collect();
     assert!(results.is_subset(&expected_superset_indexes));
@@ -401,11 +407,12 @@ fn visit_neighbors_max_results() {
         if results.len() < max_results {
             Control::Continue
         } else {
-            Control::Break(())
+            Control::Break("hello")
         }
     };
 
-    index.visit_neighbors(50, 50, &mut visitor);
+    let break_value_result = index.visit_neighbors(50, 50, &mut visitor);
+    assert!(matches!(break_value_result, Control::Break("hello")));
     results.sort();
     let expected_indexes = vec![6, 31, 75];
     assert_eq!(results, expected_indexes);
@@ -422,10 +429,11 @@ fn visit_neighbors_max_distance() {
             results.push(i);
             return Control::Continue;
         }
-        Control::Break(())
+        Control::Break(42)
     };
 
-    index.visit_neighbors(50, 50, &mut visitor);
+    let break_value_result = index.visit_neighbors(50, 50, &mut visitor);
+    assert!(matches!(break_value_result, Control::Break(42)));
     results.sort();
     let expected_indexes = vec![6, 29, 31, 75, 85];
     assert_eq!(results, expected_indexes);
@@ -444,12 +452,13 @@ fn visit_neighbors_max_results_filtered() {
                 return Control::Continue;
             }
 
-            return Control::Break(());
+            return Control::Break(88);
         }
         Control::Continue
     };
 
-    index.visit_neighbors(50, 50, &mut visitor);
+    let break_value_result = index.visit_neighbors(50, 50, &mut visitor);
+    assert!(matches!(break_value_result, Control::Break(88)));
     results.sort();
     let expected_indexes = vec![6, 16, 18, 24, 54, 80];
     assert_eq!(results, expected_indexes);
@@ -463,7 +472,8 @@ fn visit_neighbors_all_items() {
         results.push(i);
     };
 
-    index.visit_neighbors(50, 50, &mut visitor);
+    let break_value_result = index.visit_neighbors(50, 50, &mut visitor);
+    assert!(matches!(break_value_result, ()));
     results.sort();
     let expected_indexes = (0..index.count()).collect::<Vec<_>>();
     assert_eq!(results, expected_indexes);
