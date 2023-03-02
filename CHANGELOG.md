@@ -2,7 +2,7 @@
 
 All notable changes to the static_aabb2d_index crate will be documented in this file.
 
-## Unreleased
+## 1.0.0 - 2023-03-02
 
 ### Added ⭐
 
