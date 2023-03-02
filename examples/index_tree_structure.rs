@@ -58,21 +58,21 @@ fn main() {
     // dbg!(index.indices_map().len());
     // dbg!(index.indices_map()[125]);
 
-    // in order to access the actual tree node relations the map_all_boxes_index method can be used
+    // in order to access the actual tree node relations the all_box_indices method can be used
     // the indices_map will return the start index of the children for a given node index
     // or map back to the added item index in the case that the node has no children
 
     // going from all_boxes index to the index the item was originally added
     for i in 0..index.count() {
-        let added_item_index = index.map_all_boxes_index(i);
+        let added_item_index = index.all_box_indices()[i];
         assert_eq!(input_boxes[added_item_index], all_boxes[i]);
     }
 
     // finding children node start index for a node
     // note: accessing index past the item count so it must be a node with children
     let parent_node_index = index.count() + 5;
-    let children_start_index = index.map_all_boxes_index(parent_node_index);
-    let children_end_index = index.map_all_boxes_index(parent_node_index + 1);
+    let children_start_index = index.all_box_indices()[parent_node_index];
+    let children_end_index = index.all_box_indices()[parent_node_index + 1];
 
     let child_indices: Vec<usize> = (children_start_index..children_end_index).collect();
     // all child boxes should be contained by their parent
@@ -85,12 +85,12 @@ fn main() {
     // here we loop through all the parent nodes and check that their child boxes are within
     // the parent nodes extents and handle the case of the root node
     for parent_node_index in index.count()..all_boxes.len() - 1 {
-        let children_start_index = index.map_all_boxes_index(parent_node_index);
+        let children_start_index = index.all_box_indices()[parent_node_index];
         let children_end_index = if parent_node_index == all_boxes.len() - 1 {
             // root node, all_boxes length is the end
             all_boxes.len()
         } else {
-            index.map_all_boxes_index(parent_node_index + 1)
+            index.all_box_indices()[parent_node_index + 1]
         };
 
         // all child boxes should be contained by their parent

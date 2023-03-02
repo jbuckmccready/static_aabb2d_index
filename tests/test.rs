@@ -212,19 +212,19 @@ fn many_tree_levels() {
 
     let all_boxes = index.all_boxes();
 
-    // map_all_boxes_index should map back to original aabb index
+    // all_box_indices should map back to original aabb index
     for (i, curr_box) in all_boxes.iter().enumerate().take(index.count()) {
-        let added_item_index = index.map_all_boxes_index(i);
+        let added_item_index = index.all_box_indices()[i];
         assert_eq!(&input_boxes[added_item_index], curr_box);
     }
 
-    // map_all_boxes_index should get child start index
+    // all_box_indices should get child start index
     for parent_node_index in index.count()..all_boxes.len() - 1 {
-        let children_start_index = index.map_all_boxes_index(parent_node_index);
+        let children_start_index = index.all_box_indices()[parent_node_index];
         let children_end_index = if parent_node_index == all_boxes.len() - 1 {
             all_boxes.len()
         } else {
-            index.map_all_boxes_index(parent_node_index + 1)
+            index.all_box_indices()[parent_node_index + 1]
         };
 
         // all child boxes should be contained by their parent

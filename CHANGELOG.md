@@ -4,6 +4,10 @@ All notable changes to the static_aabb2d_index crate will be documented in this 
 
 ## Unreleased
 
+### Added ⭐
+
+- Added `item_indices` method to get a slice over the indices for all item boxes added.
+
 ### Changed 🔧
 
 - ⚠️ BREAKING: Index now supports being empty (no longer errors when building the index if item
@@ -14,6 +18,9 @@ All notable changes to the static_aabb2d_index crate will be documented in this 
   `visit_query_with_stack` function.
 - ⚠️ BREAKING: fixed inconsistency in `visit_neighbors` function to return break result the same as
   the `visit_neighbors_with_queue` function.
+- ⚠️ BREAKING: renamed `map_all_boxes_index` function to `all_box_indices` and changed signature to
+  return a slice rather than indexing into a slice internally.
+- Improved doc comments
 
 ## 0.7.1 - 2023-02-22
 
