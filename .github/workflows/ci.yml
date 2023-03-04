@@ -21,11 +21,6 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Toolchain info
-        run: |
-          cargo --version --verbose
-          rustc --version --verbose
-
       - name: Build
         run: |
           cargo build --workspace --verbose
