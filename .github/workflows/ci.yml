@@ -1,11 +1,11 @@
 name: CI
 
-on:
-  push:
-  pull_request:
+on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: -D warnings
+  RUSTFLAGS: -D warnings
 
 jobs:
   build:
@@ -16,10 +16,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Update local toolchain
-        run: |
-          rustup update
-          rustup component add rustfmt
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
 
       - name: Toolchain info
         run: |
@@ -45,3 +46,11 @@ jobs:
       - name: Check formatting
         run: |
           cargo fmt --all --check
+
+      - name: Clippy lint
+        run: |
+          cargo clippy -- -D warnings
+
+      - name: Check doc
+        run: |
+          cargo doc --workspace --no-deps
