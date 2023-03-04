@@ -2,6 +2,12 @@
 
 All notable changes to the static_aabb2d_index crate will be documented in this file.
 
+## Unreleased
+
+### Changed 🔧
+
+- Bumped rust edition to 2021.
+
 ## 1.0.0 - 2023-03-02
 
 ### Added ⭐
@@ -20,7 +26,7 @@ All notable changes to the static_aabb2d_index crate will be documented in this 
   the `visit_neighbors_with_queue` function.
 - ⚠️ BREAKING: renamed `map_all_boxes_index` function to `all_box_indices` and changed signature to
   return a slice rather than indexing into a slice internally.
-- Improved doc comments
+- Improved doc comments.
 
 ## 0.7.1 - 2023-02-22
 
