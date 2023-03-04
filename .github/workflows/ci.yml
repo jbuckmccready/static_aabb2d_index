@@ -3,7 +3,6 @@ name: CI
 on: [push, pull_request]
 
 env:
-  CARGO_TERM_COLOR: always
   RUSTDOCFLAGS: -D warnings
   RUSTFLAGS: -D warnings
 
