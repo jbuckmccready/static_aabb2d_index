@@ -63,9 +63,9 @@ fn main() {
     // or map back to the added item index in the case that the node has no children
 
     // going from all_boxes index to the index the item was originally added
-    for i in 0..index.count() {
+    for (i, b) in all_boxes.iter().enumerate().take(index.count()) {
         let added_item_index = index.all_box_indices()[i];
-        assert_eq!(input_boxes[added_item_index], all_boxes[i]);
+        assert_eq!(input_boxes[added_item_index], *b);
     }
 
     // finding children node start index for a node

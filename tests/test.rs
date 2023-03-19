@@ -369,8 +369,7 @@ fn visit_query_with_stack_with_many_levels() {
         results.push(i);
     };
 
-    let break_value_result = index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
-    assert!(matches!(break_value_result, ()));
+    index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
 
     results.sort();
     let expected_indexes = vec![6, 29, 31, 75];
@@ -472,8 +471,7 @@ fn visit_neighbors_all_items() {
         results.push(i);
     };
 
-    let break_value_result = index.visit_neighbors(50, 50, &mut visitor);
-    assert!(matches!(break_value_result, ()));
+    index.visit_neighbors(50, 50, &mut visitor);
     results.sort();
     let expected_indexes = (0..index.count()).collect::<Vec<_>>();
     assert_eq!(results, expected_indexes);
