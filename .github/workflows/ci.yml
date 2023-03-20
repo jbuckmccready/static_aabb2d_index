@@ -28,6 +28,14 @@ jobs:
         run: |
           cargo test --workspace --verbose
 
+      - name: Build with unsafe optimizations
+        run: |
+          cargo build --workspace --verbose --features unsafe_optimizations
+
+      - name: Run tests with unsafe optimizations
+        run: |
+          cargo test --workspace --verbose --features unsafe_optimizations
+
   lint:
     runs-on: ubuntu-latest
     steps:
