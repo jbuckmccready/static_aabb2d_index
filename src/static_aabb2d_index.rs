@@ -46,12 +46,12 @@ where
 {
     node_size: usize,
     num_items: usize,
-    level_bounds: Vec<usize>,
+    level_bounds: Box<[usize]>,
     /// boxes holds the tree data (all nodes and items)
-    boxes: Vec<AABB<T>>,
+    boxes: Box<[AABB<T>]>,
     /// indices is used to map from sorted indices to indices ordered according to the order items
     /// were added
-    indices: Vec<usize>,
+    indices: Box<[usize]>,
     // used to keep track of the current position for boxes added
     pos: usize,
 }
@@ -102,12 +102,12 @@ where
 {
     node_size: usize,
     num_items: usize,
-    level_bounds: Vec<usize>,
+    level_bounds: Box<[usize]>,
     /// boxes holds the tree data (all nodes and items)
-    boxes: Vec<AABB<T>>,
+    boxes: Box<[AABB<T>]>,
     /// indices is used to map from sorted indices to indices ordered according to the order items
     /// were added
-    indices: Vec<usize>,
+    indices: Box<[usize]>,
 }
 
 // get_at_index and set_at_index helper functions to toggle bounds checking at compile time
@@ -147,9 +147,9 @@ where
             return StaticAABB2DIndexBuilder {
                 node_size,
                 num_items,
-                level_bounds: Vec::new(),
-                boxes: Vec::new(),
-                indices: Vec::new(),
+                level_bounds: Box::new([]),
+                boxes: Box::new([]),
+                indices: Box::new([]),
                 pos: 0,
             };
         }
@@ -171,12 +171,12 @@ where
             }
         }
 
-        let boxes = vec![AABB::default(); num_nodes];
+        let boxes = std::iter::repeat(AABB::default()).take(num_nodes).collect();
 
         StaticAABB2DIndexBuilder {
             node_size,
             num_items,
-            level_bounds,
+            level_bounds: level_bounds.into_boxed_slice(),
             boxes,
             indices: (0..num_nodes).collect(),
             pos: 0,
