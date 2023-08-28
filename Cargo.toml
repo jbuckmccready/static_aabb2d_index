@@ -18,7 +18,7 @@ num-traits = "0.2"
 
 [dev-dependencies]
 # for benchmarks
-criterion = "0.4"
+criterion = "0.5"
 
 [[bench]]
 harness = false
