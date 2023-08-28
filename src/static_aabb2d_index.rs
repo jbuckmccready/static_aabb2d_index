@@ -245,13 +245,7 @@ where
         }
 
         if self.num_items == 0 {
-            return Ok(StaticAABB2DIndex {
-                node_size: self.node_size,
-                num_items: self.num_items,
-                level_bounds: self.level_bounds,
-                boxes: self.boxes,
-                indices: self.indices,
-            });
+            return Ok(self.into_index());
         }
 
         // calculate total bounds
@@ -279,13 +273,7 @@ where
                 self.pos,
                 AABB::new(min_x, min_y, max_x, max_y),
             );
-            return Ok(StaticAABB2DIndex {
-                node_size: self.node_size,
-                num_items: self.num_items,
-                level_bounds: self.level_bounds,
-                boxes: self.boxes,
-                indices: self.indices,
-            });
+            return Ok(self.into_index());
         }
 
         let width = max_x - min_x;
@@ -364,13 +352,19 @@ where
             }
         }
 
-        Ok(StaticAABB2DIndex {
+        Ok(self.into_index())
+    }
+
+    /// Helper to construct index with builder data.
+    #[inline]
+    fn into_index(self) -> StaticAABB2DIndex<T> {
+        StaticAABB2DIndex {
             node_size: self.node_size,
             num_items: self.num_items,
             level_bounds: self.level_bounds,
             boxes: self.boxes,
             indices: self.indices,
-        })
+        }
     }
 }
 
@@ -458,7 +452,8 @@ fn sort<T>(
         return;
     }
 
-    let pivot = *get_at_index(values, (left + right) >> 1);
+    let mid = (left + right) / 2;
+    let pivot = *get_at_index(values, mid);
     let mut i = left.wrapping_sub(1);
     let mut j = right.wrapping_add(1);
 
