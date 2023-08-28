@@ -235,7 +235,7 @@ where
     }
 
     fn should_break(&self) -> bool {
-        matches!(self, Err(_))
+        self.is_err()
     }
 }
 
