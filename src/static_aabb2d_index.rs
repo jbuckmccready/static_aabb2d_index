@@ -256,12 +256,14 @@ where
         let mut min_y = first_box.min_y;
         let mut max_x = first_box.max_x;
         let mut max_y = first_box.max_y;
-        for item in item_boxes_iter {
+        // using for_each method on iterator yields noticeable performance improvement (8-10%) for
+        // large number of items (1_000_000+ items) instead of using a for loop on the iterator
+        item_boxes_iter.for_each(|item| {
             min_x = min_x.min(item.min_x);
             min_y = min_y.min(item.min_y);
             max_x = max_x.max(item.max_x);
             max_y = max_y.max(item.max_y);
-        }
+        });
 
         // if number of items is less than node size then skip sorting since each node of boxes must
         // be fully scanned regardless and there is only one node

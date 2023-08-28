@@ -9,6 +9,8 @@ All notable changes to the static_aabb2d_index crate will be documented in this 
 - Bumped rust edition to 2021.
 - Changed internal Vecs to boxed slices (smaller size, and makes clear they don't change in size).
 - Internal code improvements for clarity.
+- Performance improvement when building an index with large number of item (8-10% measured for
+  1_000_000 items).
 
 ## 1.0.0 - 2023-03-02
 
