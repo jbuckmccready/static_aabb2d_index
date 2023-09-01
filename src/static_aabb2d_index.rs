@@ -210,12 +210,12 @@ where
         );
 
         #[cfg(not(feature = "unsafe_optimizations"))]
-        let boxes = std::iter::repeat_with(|| AABB::default())
+        let boxes = std::iter::repeat_with(AABB::default)
             .take(num_nodes)
             .collect();
 
         #[cfg(feature = "unsafe_optimizations")]
-        let boxes = std::iter::repeat_with(|| std::mem::MaybeUninit::uninit())
+        let boxes = std::iter::repeat_with(std::mem::MaybeUninit::uninit)
             .take(num_nodes)
             .collect();
 
