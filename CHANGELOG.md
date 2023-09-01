@@ -13,6 +13,10 @@ All notable changes to the static_aabb2d_index crate will be documented in this 
   1_000_000 items).
 - Avoid some allocations when building an index by determining the exact length of the
   `level_bounds` array before constructing it (performance improvement).
+- Added uninitialized memory optimization when the feature flag `unsafe_optimizations` is on. This
+  further improves performance when building an index by avoiding zeroing the array of AABBs
+  allocated for the all the boxes. Care was taken to avoid undefined behavior due to reading from or
+  creating references to any uninitialized memory.
 
 ## 1.0.0 - 2023-03-02
 

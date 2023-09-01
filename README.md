@@ -7,7 +7,10 @@ spatial ordering. This is a rust port of the excellent
 [flatbush](https://github.com/mourner/flatbush) javascript library.
 
 By default no unsafe code is used (`#![forbid(unsafe_code)]` is applied). Some unsafe optimizations
-can be enabled by toggling on the `unsafe_optimizations` flag.
+can be enabled by toggling on the `unsafe_optimizations` flag. Note the API is still safe when this
+flag is enabled, all optimizations are internal to the library. Currently the unsafe code is used
+to eliminate slice bounds checking and utilize uninitialized memory to avoid zeroing arrays when
+allocated.
 
 ## Quick Links
 

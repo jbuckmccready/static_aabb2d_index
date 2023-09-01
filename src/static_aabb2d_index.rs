@@ -47,15 +47,11 @@ where
     node_size: usize,
     num_items: usize,
     level_bounds: Box<[usize]>,
-    /// boxes holds the tree data (all nodes and items)
     #[cfg(feature = "unsafe_optimizations")]
     boxes: Box<[std::mem::MaybeUninit<AABB<T>>]>,
     #[cfg(not(feature = "unsafe_optimizations"))]
     boxes: Box<[AABB<T>]>,
-    /// indices is used to map from sorted indices to indices ordered according to the order items
-    /// were added
     indices: Box<[usize]>,
-    // used to keep track of the current position for boxes added
     pos: usize,
 }
 
@@ -106,14 +102,14 @@ where
     node_size: usize,
     num_items: usize,
     level_bounds: Box<[usize]>,
-    /// boxes holds the tree data (all nodes and items)
     boxes: Box<[AABB<T>]>,
-    /// indices is used to map from sorted indices to indices ordered according to the order items
-    /// were added
     indices: Box<[usize]>,
 }
 
-// get_at_index and set_at_index helper functions to toggle bounds checking at compile time
+// Helper functions to toggle bounds checking/uninitialized memory handling. NOTE: the functions are
+// not marked unsafe to facilitate easy global usages since we never rely on these functions
+// throwing a panic (so with unsafe_optimizations feature on we assume correct bounds and
+// initialization).
 #[cfg(not(feature = "unsafe_optimizations"))]
 #[inline(always)]
 fn get_at_index<T>(container: &[T], index: usize) -> &T {
@@ -315,6 +311,7 @@ where
         }
 
         #[cfg(feature = "unsafe_optimizations")]
+        // SAFETY: All the item boxes are initialized (all elements from index 0 to num_items - 1).
         let item_boxes: &mut [AABB<T>] =
             unsafe { std::mem::transmute(&mut self.boxes[0..self.num_items]) };
 
@@ -350,7 +347,11 @@ where
             );
 
             #[cfg(feature = "unsafe_optimizations")]
+            // SAFETY: All boxes are initialized.
             let boxes: Box<[AABB<T>]> = unsafe { std::mem::transmute(self.boxes) };
+
+            #[cfg(not(feature = "unsafe_optimizations"))]
+            let boxes = self.boxes;
 
             return Ok(StaticAABB2DIndex {
                 node_size: self.node_size,
@@ -441,7 +442,11 @@ where
         }
 
         #[cfg(feature = "unsafe_optimizations")]
+        // SAFETY: All boxes are initialized.
         let boxes: Box<[AABB<T>]> = unsafe { std::mem::transmute(self.boxes) };
+
+        #[cfg(not(feature = "unsafe_optimizations"))]
+        let boxes = self.boxes;
 
         Ok(StaticAABB2DIndex {
             node_size: self.node_size,
