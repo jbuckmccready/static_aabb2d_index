@@ -11,6 +11,8 @@ All notable changes to the static_aabb2d_index crate will be documented in this 
 - Internal code improvements for clarity.
 - Performance improvement when building an index with large number of item (8-10% measured for
   1_000_000 items).
+- Avoid some allocations when building an index by determining the exact length of the
+  `level_bounds` array before constructing it (performance improvement).
 
 ## 1.0.0 - 2023-03-02
 

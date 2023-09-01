@@ -157,11 +157,26 @@ where
         let node_size = node_size.clamp(2, 65535);
 
         let mut n = num_items;
-        let mut num_nodes = num_items;
-        let mut level_bounds: Vec<usize> = vec![n];
+        let level_bounds_len = {
+            // keep subdividing num_items by node_size to get length of level bounds array to
+            // represent the R-tree (doing this now to get exact allocation required)
+            let mut len = 1;
+            loop {
+                n = (n as f64 / node_size as f64).ceil() as usize;
+                len += 1;
+                if n == 1 {
+                    break;
+                }
+            }
+            len
+        };
 
-        // calculate the total number of nodes in the R-tree to allocate space for
-        // and the index of each tree level (level_bounds, used in search later)
+        // allocate the exact length required for the level bounds and add the level bound index
+        // positions and build up total num_nodes for the tree
+        n = num_items;
+        let mut num_nodes = num_items;
+        let mut level_bounds: Vec<usize> = Vec::with_capacity(level_bounds_len);
+        level_bounds.push(n);
         loop {
             n = (n as f64 / node_size as f64).ceil() as usize;
             num_nodes += n;
@@ -170,6 +185,12 @@ where
                 break;
             }
         }
+
+        debug_assert_eq!(
+            level_bounds.capacity(),
+            level_bounds.len(),
+            "ensure exact allocation"
+        );
 
         let boxes = std::iter::repeat(AABB::default()).take(num_nodes).collect();
 
