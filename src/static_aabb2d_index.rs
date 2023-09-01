@@ -48,6 +48,9 @@ where
     num_items: usize,
     level_bounds: Box<[usize]>,
     /// boxes holds the tree data (all nodes and items)
+    #[cfg(feature = "unsafe_optimizations")]
+    boxes: Box<[std::mem::MaybeUninit<AABB<T>>]>,
+    #[cfg(not(feature = "unsafe_optimizations"))]
     boxes: Box<[AABB<T>]>,
     /// indices is used to map from sorted indices to indices ordered according to the order items
     /// were added
@@ -123,6 +126,12 @@ fn get_at_index<T>(container: &[T], index: usize) -> &T {
     unsafe { container.get_unchecked(index) }
 }
 
+#[cfg(feature = "unsafe_optimizations")]
+#[inline(always)]
+fn get_uninit_at_index<T>(container: &[std::mem::MaybeUninit<T>], index: usize) -> T {
+    unsafe { container.get_unchecked(index).assume_init_read() }
+}
+
 #[cfg(not(feature = "unsafe_optimizations"))]
 #[inline(always)]
 fn set_at_index<T>(container: &mut [T], index: usize, value: T) {
@@ -135,6 +144,18 @@ fn set_at_index<T>(container: &mut [T], index: usize, value: T) {
     unsafe {
         *container.get_unchecked_mut(index) = value;
     }
+}
+
+#[cfg(feature = "unsafe_optimizations")]
+fn write_uninit_at_index<T>(container: &mut [std::mem::MaybeUninit<T>], index: usize, value: T) {
+    unsafe {
+        container.get_unchecked_mut(index).write(value);
+    }
+}
+
+#[cfg(not(feature = "unsafe_optimizations"))]
+fn write_uninit_at_index<T>(container: &mut [T], index: usize, value: T) {
+    container[index] = value;
 }
 
 impl<T> StaticAABB2DIndexBuilder<T>
@@ -192,7 +213,15 @@ where
             "ensure exact allocation"
         );
 
-        let boxes = std::iter::repeat(AABB::default()).take(num_nodes).collect();
+        #[cfg(not(feature = "unsafe_optimizations"))]
+        let boxes = std::iter::repeat_with(|| AABB::default())
+            .take(num_nodes)
+            .collect();
+
+        #[cfg(feature = "unsafe_optimizations")]
+        let boxes = std::iter::repeat_with(|| std::mem::MaybeUninit::uninit())
+            .take(num_nodes)
+            .collect();
 
         StaticAABB2DIndexBuilder {
             node_size,
@@ -241,11 +270,21 @@ where
         debug_assert!(min_x <= max_x);
         debug_assert!(min_y <= max_y);
 
+        #[cfg(not(feature = "unsafe_optimizations"))]
         set_at_index(
             &mut self.boxes,
             self.pos,
             AABB::new(min_x, min_y, max_x, max_y),
         );
+
+        #[cfg(feature = "unsafe_optimizations")]
+        // SAFETY: we checked the index bounds by comparing self.pos with self.num_items already.
+        unsafe {
+            self.boxes
+                .get_unchecked_mut(self.pos)
+                .write(AABB::new(min_x, min_y, max_x, max_y));
+        }
+
         self.pos += 1;
         self
     }
@@ -266,11 +305,24 @@ where
         }
 
         if self.num_items == 0 {
-            return Ok(self.into_index());
+            return Ok(StaticAABB2DIndex {
+                node_size: self.node_size,
+                num_items: self.num_items,
+                level_bounds: self.level_bounds,
+                boxes: Box::new([]),
+                indices: self.indices,
+            });
         }
 
+        #[cfg(feature = "unsafe_optimizations")]
+        let item_boxes: &mut [AABB<T>] =
+            unsafe { std::mem::transmute(&mut self.boxes[0..self.num_items]) };
+
+        #[cfg(not(feature = "unsafe_optimizations"))]
+        let item_boxes = &mut self.boxes[0..self.num_items];
+
         // calculate total bounds
-        let mut item_boxes_iter = self.boxes.iter().take(self.num_items);
+        let mut item_boxes_iter = item_boxes.iter();
         // initialize values with first box
         let first_box = item_boxes_iter.next().unwrap();
         let mut min_x = first_box.min_x;
@@ -291,12 +343,22 @@ where
         if self.num_items <= self.node_size {
             set_at_index(&mut self.indices, self.pos, 0);
             // fill root box with total extents
-            set_at_index(
+            write_uninit_at_index(
                 &mut self.boxes,
                 self.pos,
                 AABB::new(min_x, min_y, max_x, max_y),
             );
-            return Ok(self.into_index());
+
+            #[cfg(feature = "unsafe_optimizations")]
+            let boxes: Box<[AABB<T>]> = unsafe { std::mem::transmute(self.boxes) };
+
+            return Ok(StaticAABB2DIndex {
+                node_size: self.node_size,
+                num_items: self.num_items,
+                level_bounds: self.level_bounds,
+                boxes,
+                indices: self.indices,
+            });
         }
 
         let width = max_x - min_x;
@@ -311,7 +373,7 @@ where
         // of the entire set of bounding boxes maps to n - 1 our 2d space is x: [0 -> n-1] and
         // y: [0 -> n-1], our 1d hilbert curve value space is d: [0 -> n^2 - 1]
         let mut hilbert_values: Vec<u32> = Vec::with_capacity(self.num_items);
-        for aabb in self.boxes.iter().take(self.num_items) {
+        for aabb in item_boxes.iter() {
             let x = if width == T::zero() {
                 0
             } else {
@@ -332,7 +394,7 @@ where
         // sort items by their Hilbert value for constructing the tree
         sort(
             &mut hilbert_values,
-            &mut self.boxes,
+            item_boxes,
             &mut self.indices,
             0,
             self.num_items - 1,
@@ -355,7 +417,10 @@ where
                 // calculate bounding box for the new node
                 let mut j = 0;
                 while j < self.node_size && pos < end {
+                    #[cfg(not(feature = "unsafe_optimizations"))]
                     let aabb = get_at_index(&self.boxes, pos);
+                    #[cfg(feature = "unsafe_optimizations")]
+                    let aabb = get_uninit_at_index(&self.boxes, pos);
                     pos += 1;
                     node_min_x = T::min(node_min_x, aabb.min_x);
                     node_min_y = T::min(node_min_y, aabb.min_y);
@@ -366,7 +431,7 @@ where
 
                 // add the new node to the tree
                 set_at_index(&mut self.indices, self.pos, node_index);
-                set_at_index(
+                write_uninit_at_index(
                     &mut self.boxes,
                     self.pos,
                     AABB::new(node_min_x, node_min_y, node_max_x, node_max_y),
@@ -375,19 +440,16 @@ where
             }
         }
 
-        Ok(self.into_index())
-    }
+        #[cfg(feature = "unsafe_optimizations")]
+        let boxes: Box<[AABB<T>]> = unsafe { std::mem::transmute(self.boxes) };
 
-    /// Helper to construct index with builder data.
-    #[inline]
-    fn into_index(self) -> StaticAABB2DIndex<T> {
-        StaticAABB2DIndex {
+        Ok(StaticAABB2DIndex {
             node_size: self.node_size,
             num_items: self.num_items,
             level_bounds: self.level_bounds,
-            boxes: self.boxes,
+            boxes,
             indices: self.indices,
-        }
+        })
     }
 }
 
