@@ -404,11 +404,9 @@ where
 
         // generate nodes at each tree level, bottom-up
         let mut pos = 0;
-        for i in 0..self.level_bounds.len() - 1 {
-            let end = *get_at_index(&self.level_bounds, i);
-
+        for &level_end in self.level_bounds[0..self.level_bounds.len() - 1].iter() {
             // generate a parent node for each block of consecutive node_size nodes
-            while pos < end {
+            while pos < level_end {
                 let mut node_min_x = T::max_value();
                 let mut node_min_y = T::max_value();
                 let mut node_max_x = T::min_value();
@@ -417,7 +415,7 @@ where
 
                 // calculate bounding box for the new node
                 let mut j = 0;
-                while j < self.node_size && pos < end {
+                while j < self.node_size && pos < level_end {
                     #[cfg(not(feature = "unsafe_optimizations"))]
                     let aabb = get_at_index(&self.boxes, pos);
                     #[cfg(feature = "unsafe_optimizations")]
