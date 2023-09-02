@@ -32,7 +32,7 @@ impl fmt::Display for StaticAABB2DIndexBuildError {
             ),
             StaticAABB2DIndexBuildError::NumericCastError => write!(
                 f,
-                "numeric cast to/from type T to u16 failed (may be due to overflow/underflow)"
+                "numeric cast of type T to/from u16 failed (may be due to overflow/underflow)"
             ),
         }
     }
