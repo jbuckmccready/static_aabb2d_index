@@ -247,6 +247,19 @@ fn total_extents() {
 }
 
 #[test]
+fn expected_indices_order() {
+    let index = create_test_index();
+    let expected_indices = &[
+        95, 92, 87, 70, 67, 64, 55, 52, 49, 43, 40, 11, 26, 19, 44, 9, 59, 84, 77, 39, 6, 75, 80,
+        18, 23, 62, 58, 88, 86, 27, 90, 0, 73, 7, 37, 30, 13, 14, 48, 17, 56, 79, 25, 38, 85, 76,
+        91, 66, 24, 33, 21, 3, 99, 16, 54, 28, 29, 68, 50, 31, 22, 72, 78, 83, 53, 89, 51, 93, 81,
+        20, 8, 96, 4, 63, 74, 5, 47, 32, 10, 98, 61, 82, 57, 97, 65, 35, 41, 2, 45, 46, 36, 42, 69,
+        34, 1, 60, 15, 94, 12, 71, 0, 16, 32, 48, 64, 80, 96, 100,
+    ];
+    assert_eq!(index.all_box_indices(), expected_indices);
+}
+
+#[test]
 fn query() {
     let index = create_test_index();
     let mut results: Vec<usize> = index.query(40, 40, 60, 60);

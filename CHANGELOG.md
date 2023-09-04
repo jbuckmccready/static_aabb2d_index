@@ -2,6 +2,30 @@
 
 All notable changes to the static_aabb2d_index crate will be documented in this file.
 
+## 2.0.0 - 2023-09-04
+
+### Fixed 🐛
+
+- Fixed building index properly for integer types. Previously due to integer division truncation
+  and the way the hilbert coordinate values were computed the index was not properly
+  sorted/structured when using integer values (this lead to a less optimal tree for querying,
+  despite everything still querying properly). Hilbert coordinate values are now computed using
+  `f64` to properly scale and work in all integer cases. This improves performance of the index when
+  using integers.
+
+### Changed 🔧
+
+- ⚠️ MINOR BREAKING: numeric type used is now required to successfully cast to a `f64` (previously
+  expected to cast to/from `u16`). This is a very minor breaking change, and only arises when using
+  a non-builtin numeric type that for whatever reason cannot cast to a `f64` but is able to cast
+  to/from a `u16`. Major version number was bumped since this is technically a breaking change for
+  a weird edge use case.
+- Numeric type used no longer requires casting to/from a `u16`.
+- Rearranged math expressions when building hilbert coordinate values for performance improvement
+  (~5%).
+- Implemented the `IndexableNum` trait for `i8`, `u8`, and `i16` types (those types are now
+  supported, this came as part of the fix for integer types).
+
 ## 1.1.0 - 2023-08-31
 
 ### Changed 🔧

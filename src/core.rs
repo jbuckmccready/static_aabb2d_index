@@ -51,8 +51,9 @@ macro_rules! impl_indexable_num_for_ord_type {
 }
 
 // impl for all supported built in types
-// note that other builtin primitive numbers are not supported
-// since the type must cast to/from u16 to be supported
+impl_indexable_num_for_ord_type!(i8);
+impl_indexable_num_for_ord_type!(u8);
+impl_indexable_num_for_ord_type!(i16);
 impl_indexable_num_for_ord_type!(u16);
 impl_indexable_num_for_ord_type!(i32);
 impl_indexable_num_for_ord_type!(u32);

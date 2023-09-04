@@ -1,4 +1,5 @@
 use fmt::Debug;
+use num_traits::ToPrimitive;
 use std::fmt;
 use std::{cmp::min, collections::BinaryHeap};
 
@@ -15,7 +16,7 @@ pub enum StaticAABB2DIndexBuildError {
         /// The number of items that were expected (set at construction).
         expected: usize,
     },
-    /// Error for the case when the numeric type T used for the index fails to cast to/from u16.
+    /// Error for the case when the numeric type T used for the index fails to cast to f64.
     NumericCastError,
 }
 
@@ -30,10 +31,9 @@ impl fmt::Display for StaticAABB2DIndexBuildError {
                 (added: {}, expected: {})",
                 added, expected
             ),
-            StaticAABB2DIndexBuildError::NumericCastError => write!(
-                f,
-                "numeric cast of type T to/from u16 failed (may be due to overflow/underflow)"
-            ),
+            StaticAABB2DIndexBuildError::NumericCastError => {
+                write!(f, "numeric type T used for index failed to cast to f64")
+            }
         }
     }
 }
@@ -76,7 +76,7 @@ where
 /// builder.add(0.0, 0.0, 1.0, 3.0);
 /// builder.add(4.0, 2.0, 16.0, 8.0);
 /// // note build may return an error if the number of added boxes does not equal the static size
-/// // given at the time the builder was created or the type used fails to cast to/from a u16
+/// // given at the time the builder was created or the type used fails to cast to a f64
 /// let index: StaticAABB2DIndex<f64> = builder.build().unwrap();
 /// // query the created index (min_x, min_y, max_x, max_y)
 /// let query_results = index.query(-1.0, -1.0, -0.5, -0.5);
@@ -290,7 +290,7 @@ where
     /// If the number of added items does not match the count given at the time the builder was
     /// created then a [`StaticAABB2DIndexBuildError::ItemCountError`] will be returned.
     ///
-    /// If the numeric type T fails to cast to/from a u16 for any reason then a
+    /// If the numeric type T fails to cast to a f64 for any reason then a
     /// [`StaticAABB2DIndexBuildError::NumericCastError`] will be returned.
     pub fn build(mut self) -> Result<StaticAABB2DIndex<T>, StaticAABB2DIndexBuildError> {
         if self.pos != self.num_items {
@@ -362,12 +362,41 @@ where
             });
         }
 
-        let width = max_x - min_x;
-        let height = max_y - min_y;
+        // helper function to cast T to f64
+        let cast_to_f64 = |x: T| -> Result<f64, StaticAABB2DIndexBuildError> {
+            x.to_f64()
+                .ok_or(StaticAABB2DIndexBuildError::NumericCastError)
+        };
+
+        let width = cast_to_f64(max_x - min_x)?;
+        let height = cast_to_f64(max_y - min_y)?;
+        let extent_min_x = cast_to_f64(min_x)?;
+        let extent_min_y = cast_to_f64(min_y)?;
 
         // hilbert max input value for x and y
-        let hilbert_max = T::from(u16::MAX).ok_or(StaticAABB2DIndexBuildError::NumericCastError)?;
-        let two = T::from(2u16).ok_or(StaticAABB2DIndexBuildError::NumericCastError)?;
+        let hilbert_max = u16::MAX as f64;
+        let scaled_width = hilbert_max / width;
+        let scaled_height = hilbert_max / height;
+
+        // helper function to build hilbert coordinate value from AABB
+        fn hilbert_coord(scaled_extent: f64, aabb_min: f64, aabb_max: f64, extent_min: f64) -> u16 {
+            let value = scaled_extent * (0.5 * (aabb_min + aabb_max) - extent_min);
+            // this should successfully convert to u16 since scaled_extent should be between 0 and
+            // u16::MAX and the coefficient should be between 0.0 and 1.0, but in the case of
+            // positive/negative infinity (width or height is 0.0) or NAN (inputs contain NAN) we
+            // want to continue
+            value.to_u16().unwrap_or(
+                // saturate
+                if value > u16::MAX as f64 {
+                    u16::MAX
+                } else if value < u16::MIN as f64 {
+                    u16::MIN
+                } else {
+                    // NAN
+                    0
+                },
+            )
+        }
 
         // mapping the x and y coordinates of the center of the item boxes to values in the range
         // [0 -> n - 1] such that the min of the entire set of bounding boxes maps to 0 and the max
@@ -375,20 +404,13 @@ where
         // y: [0 -> n-1], our 1d hilbert curve value space is d: [0 -> n^2 - 1]
         let mut hilbert_values: Vec<u32> = Vec::with_capacity(self.num_items);
         for aabb in item_boxes.iter() {
-            let x = if width == T::zero() {
-                0
-            } else {
-                (hilbert_max * ((aabb.min_x + aabb.max_x) / two - min_x) / width)
-                    .to_u16()
-                    .ok_or(StaticAABB2DIndexBuildError::NumericCastError)?
-            };
-            let y = if height == T::zero() {
-                0
-            } else {
-                (hilbert_max * ((aabb.min_y + aabb.max_y) / two - min_y) / height)
-                    .to_u16()
-                    .ok_or(StaticAABB2DIndexBuildError::NumericCastError)?
-            };
+            let aabb_min_x = cast_to_f64(aabb.min_x)?;
+            let aabb_min_y = cast_to_f64(aabb.min_y)?;
+            let aabb_max_x = cast_to_f64(aabb.max_x)?;
+            let aabb_max_y = cast_to_f64(aabb.max_y)?;
+
+            let x = hilbert_coord(scaled_width, aabb_min_x, aabb_max_x, extent_min_x);
+            let y = hilbert_coord(scaled_height, aabb_min_y, aabb_max_y, extent_min_y);
             hilbert_values.push(hilbert_xy_to_index(x, y));
         }
 
