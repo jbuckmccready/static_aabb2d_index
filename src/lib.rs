@@ -23,7 +23,7 @@
 //! builder.add(0.0, 0.0, 1.0, 3.0);
 //! builder.add(4.0, 2.0, 16.0, 8.0);
 //! // note build() may return an error if the number of added boxes does not equal the static size
-//! // given at the time the builder was created or the type used fails to cast to/from a u16
+//! // given at the time the builder was created or the type used fails to cast to a f64
 //! let index: StaticAABB2DIndex<f64> = builder.build().unwrap();
 //! // query the created index (min_x, min_y, max_x, max_y)
 //! let query_results = index.query(-1.0, -1.0, -0.5, -0.5);
