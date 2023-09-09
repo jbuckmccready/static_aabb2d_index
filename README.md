@@ -20,6 +20,8 @@ allocated.
 
 [Examples](/examples)
 
+[Benchmarks Repo](https://github.com/jbuckmccready/static_aabb2d_index_bench)
+
 ## Quick Code Example
 
 ```rust
