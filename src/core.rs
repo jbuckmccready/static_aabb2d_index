@@ -2,10 +2,10 @@ use std::cmp::Ordering;
 
 use num_traits::{Bounded, Num, NumCast};
 
-/// Trait used by the [StaticAABB2DIndex](crate::StaticAABB2DIndex) that is required to be
-/// implemented for type T. It is blanket implemented for all supported primitive numeric types.
+/// Trait used by the [`StaticAABB2DIndex`](crate::StaticAABB2DIndex) that is required to be
+/// implemented for type `T`. It is blanket implemented for all supported primitive numeric types.
 pub trait IndexableNum: Copy + Num + PartialOrd + Default + Bounded + NumCast {
-    /// Simple default min implementation for [PartialOrd] types.
+    /// Simple default min implementation for [`PartialOrd`] types.
     #[inline]
     fn min(self, other: Self) -> Self {
         if self < other {
@@ -15,7 +15,7 @@ pub trait IndexableNum: Copy + Num + PartialOrd + Default + Bounded + NumCast {
         other
     }
 
-    /// Simple default max implementation for [PartialOrd] types.
+    /// Simple default max implementation for [`PartialOrd`] types.
     #[inline]
     fn max(self, other: Self) -> Self {
         if self > other {
@@ -25,8 +25,8 @@ pub trait IndexableNum: Copy + Num + PartialOrd + Default + Bounded + NumCast {
         other
     }
 
-    /// Total comparison between numbers. For types which implement [Ord] this should just use the
-    /// [Ord::cmp] method. For [f32] and [f64] types the `f32::total_cmp` and `f64::total_cmp`
+    /// Total comparison between numbers. For types which implement [`Ord`] this should just use the
+    /// [`Ord::cmp`] method. For [`f32`] and [`f64`] types the `f32::total_cmp` and `f64::total_cmp`
     /// methods are used.
     fn total_cmp(&self, other: &Self) -> Ordering;
 }
@@ -154,7 +154,7 @@ where
     }
 
     /// Tests if this AABB overlaps another AABB.
-    /// Same as [AABB::overlaps_aabb] but accepts AABB extent parameters directly.
+    /// Same as [`AABB::overlaps_aabb`] but accepts AABB extent parameters directly.
     #[inline]
     pub fn overlaps(&self, min_x: T, min_y: T, max_x: T, max_y: T) -> bool {
         if self.max_x < min_x || self.max_y < min_y || self.min_x > max_x || self.min_y > max_y {
@@ -180,7 +180,7 @@ where
     }
 
     /// Tests if this AABB fully contains another AABB.
-    /// Same as [AABB::contains] but accepts AABB extent parameters directly.
+    /// Same as [`AABB::contains`] but accepts AABB extent parameters directly.
     #[inline]
     pub fn contains(&self, min_x: T, min_y: T, max_x: T, max_y: T) -> bool {
         self.min_x <= min_x && self.min_y <= min_y && self.max_x >= max_x && self.max_y >= max_y
@@ -240,9 +240,9 @@ where
     }
 }
 
-/// Visitor trait used to visit the results of a StaticAABB2DIndex query.
+/// Visitor trait used to visit the results of a `StaticAABB2DIndex` query.
 ///
-/// This trait is blanket implemented for FnMut(usize) -> impl ControlFlow.
+/// This trait is blanket implemented for `FnMut(usize) -> impl ControlFlow`.
 pub trait QueryVisitor<T, C>
 where
     T: IndexableNum,
@@ -264,7 +264,7 @@ where
     }
 }
 
-/// Visitor trait used to visit the results of a StaticAABB2DIndex nearest neighbors query.
+/// Visitor trait used to visit the results of a `StaticAABB2DIndex` nearest neighbors query.
 pub trait NeighborVisitor<T, C>
 where
     T: IndexableNum,
