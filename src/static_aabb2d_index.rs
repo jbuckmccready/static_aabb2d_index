@@ -670,7 +670,7 @@ where
     }
 }
 
-impl<'a, T> Iterator for QueryIterator<'a, T>
+impl<T> Iterator for QueryIterator<'_, T>
 where
     T: IndexableNum,
 {
@@ -802,7 +802,7 @@ where
     }
 }
 
-impl<'a, T> Iterator for QueryIteratorStackRef<'a, T>
+impl<T> Iterator for QueryIteratorStackRef<'_, T>
 where
     T: IndexableNum,
 {
