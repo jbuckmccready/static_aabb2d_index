@@ -1,4 +1,4 @@
-use static_aabb2d_index::{StaticAABB2DIndexBuilder, AABB};
+use static_aabb2d_index::{AABB, StaticAABB2DIndexBuilder};
 
 fn main() {
     // this is an example demonstrating how to extract the index tree from an index

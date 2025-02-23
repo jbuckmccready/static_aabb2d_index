@@ -3,7 +3,7 @@ use num_traits::ToPrimitive;
 use std::fmt;
 use std::{cmp::min, collections::BinaryHeap};
 
-use crate::{try_control, ControlFlow, IndexableNum, NeighborVisitor, QueryVisitor, AABB};
+use crate::{AABB, ControlFlow, IndexableNum, NeighborVisitor, QueryVisitor, try_control};
 
 /// Error type for errors that may be returned in attempting to build the index.
 #[derive(Debug, PartialEq)]
