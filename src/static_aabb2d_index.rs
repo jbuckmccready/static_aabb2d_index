@@ -16,7 +16,7 @@ pub enum StaticAABB2DIndexBuildError {
         /// The number of items that were expected (set at construction).
         expected: usize,
     },
-    /// Error for the case when the numeric type T used for the index fails to cast to f64.
+    /// Error for the case when the numeric type `T` used for the index fails to cast to `f64`.
     NumericCastError,
 }
 
@@ -38,7 +38,7 @@ impl fmt::Display for StaticAABB2DIndexBuildError {
     }
 }
 
-/// Used to build a [StaticAABB2DIndex].
+/// Used to build a [`StaticAABB2DIndex`].
 #[derive(Debug, Clone)]
 pub struct StaticAABB2DIndexBuilder<T = f64>
 where
@@ -61,7 +61,7 @@ where
 /// This type is constructed from a [`StaticAABB2DIndexBuilder`].
 ///
 /// 2D axis aligned bounding boxes are represented by two extent points (four values):
-/// (min_x, min_y), (max_x, max_y).
+/// `(min_x, min_y), (max_x, max_y)`.
 ///
 /// # Examples
 /// ```
