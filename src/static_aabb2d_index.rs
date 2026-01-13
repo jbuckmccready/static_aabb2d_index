@@ -215,9 +215,7 @@ where
             .collect();
 
         #[cfg(feature = "unsafe_optimizations")]
-        let boxes = std::iter::repeat_with(std::mem::MaybeUninit::uninit)
-            .take(num_nodes)
-            .collect();
+        let boxes = Box::new_uninit_slice(num_nodes);
 
         StaticAABB2DIndexBuilder {
             node_size,
