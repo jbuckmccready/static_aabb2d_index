@@ -3,7 +3,7 @@ authors = ["Buck McCready <jbuckmccready@gmail.com>"]
 categories = ["algorithms", "data-structures", "graphics", "mathematics"]
 description = "Fast static spatial index data structure for 2D axis aligned bounding boxes"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.86"
 keywords = ["algorithm", "2d", "computational", "geometry", "spatial"]
 license = "MIT OR Apache-2.0"
 name = "static_aabb2d_index"
@@ -18,7 +18,7 @@ unsafe_optimizations = []
 num-traits = "0.2"
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8.2"
 
 [[bench]]
 name = "bench_static_aabb2d_index"
