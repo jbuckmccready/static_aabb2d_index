@@ -286,9 +286,7 @@ where
             .collect();
 
         #[cfg(feature = "unsafe_optimizations")]
-        let boxes = std::iter::repeat_with(std::mem::MaybeUninit::uninit)
-            .take(num_nodes)
-            .collect();
+        let boxes = Box::new_uninit_slice(num_nodes);
 
         StaticAABB2DIndexBuilder {
             node_size,
@@ -432,7 +430,7 @@ where
 
             #[cfg(feature = "unsafe_optimizations")]
             // SAFETY: All boxes are initialized.
-            let boxes: Box<[AABB<T>]> = unsafe { std::mem::transmute(self.boxes) };
+            let boxes: Box<[AABB<T>]> = unsafe { self.boxes.assume_init() };
 
             #[cfg(not(feature = "unsafe_optimizations"))]
             let boxes = self.boxes;
@@ -495,7 +493,7 @@ where
 
         #[cfg(feature = "unsafe_optimizations")]
         // SAFETY: All boxes are initialized.
-        let boxes: Box<[AABB<T>]> = unsafe { std::mem::transmute(self.boxes) };
+        let boxes: Box<[AABB<T>]> = unsafe { self.boxes.assume_init() };
 
         #[cfg(not(feature = "unsafe_optimizations"))]
         let boxes = self.boxes;
