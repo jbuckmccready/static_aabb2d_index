@@ -17,5 +17,15 @@ unsafe_optimizations = []
 [dependencies]
 num-traits = "0.2"
 
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "bench_static_aabb2d_index"
+harness = false
+
+[lib]
+bench = false
+
 [lints.clippy]
 pedantic = "warn"
