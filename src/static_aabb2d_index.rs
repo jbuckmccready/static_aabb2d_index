@@ -16,7 +16,7 @@ pub enum StaticAABB2DIndexBuildError {
         /// The number of items that were expected (set at construction).
         expected: usize,
     },
-    /// Error for the case when the numeric type T used for the index fails to cast to f64.
+    /// Error for the case when the numeric type `T` used for the index fails to cast to `f64`.
     NumericCastError,
 }
 
@@ -28,8 +28,7 @@ impl fmt::Display for StaticAABB2DIndexBuildError {
             StaticAABB2DIndexBuildError::ItemCountError { added, expected } => write!(
                 f,
                 "added item count should equal static size given to builder \
-                (added: {}, expected: {})",
-                added, expected
+                (added: {added}, expected: {expected})"
             ),
             StaticAABB2DIndexBuildError::NumericCastError => {
                 write!(f, "numeric type T used for index failed to cast to f64")
@@ -38,7 +37,7 @@ impl fmt::Display for StaticAABB2DIndexBuildError {
     }
 }
 
-/// Used to build a [StaticAABB2DIndex].
+/// Used to build a [`StaticAABB2DIndex`].
 #[derive(Debug, Clone)]
 pub struct StaticAABB2DIndexBuilder<T = f64>
 where
@@ -61,7 +60,7 @@ where
 /// This type is constructed from a [`StaticAABB2DIndexBuilder`].
 ///
 /// 2D axis aligned bounding boxes are represented by two extent points (four values):
-/// (min_x, min_y), (max_x, max_y).
+/// `(min_x, min_y), (max_x, max_y)`.
 ///
 /// # Examples
 /// ```
@@ -111,31 +110,31 @@ where
 // throwing a panic (so with unsafe_optimizations feature on we assume correct bounds and
 // initialization).
 #[cfg(not(feature = "unsafe_optimizations"))]
-#[inline(always)]
+#[inline]
 fn get_at_index<T>(container: &[T], index: usize) -> &T {
     &container[index]
 }
 
 #[cfg(feature = "unsafe_optimizations")]
-#[inline(always)]
+#[inline]
 fn get_at_index<T>(container: &[T], index: usize) -> &T {
     unsafe { container.get_unchecked(index) }
 }
 
 #[cfg(feature = "unsafe_optimizations")]
-#[inline(always)]
+#[inline]
 fn get_uninit_at_index<T>(container: &[std::mem::MaybeUninit<T>], index: usize) -> T {
     unsafe { container.get_unchecked(index).assume_init_read() }
 }
 
 #[cfg(not(feature = "unsafe_optimizations"))]
-#[inline(always)]
+#[inline]
 fn set_at_index<T>(container: &mut [T], index: usize, value: T) {
     container[index] = value;
 }
 
 #[cfg(feature = "unsafe_optimizations")]
-#[inline(always)]
+#[inline]
 fn set_at_index<T>(container: &mut [T], index: usize, value: T) {
     unsafe {
         *container.get_unchecked_mut(index) = value;
@@ -152,6 +151,78 @@ fn write_uninit_at_index<T>(container: &mut [std::mem::MaybeUninit<T>], index: u
 #[cfg(not(feature = "unsafe_optimizations"))]
 fn write_uninit_at_index<T>(container: &mut [T], index: usize, value: T) {
     container[index] = value;
+}
+
+// Builds a Hilbert coordinate value from an axis-aligned bounding box.
+fn hilbert_coord(scaled_extent: f64, aabb_min: f64, aabb_max: f64, extent_min: f64) -> u16 {
+    let value = scaled_extent * (0.5 * (aabb_min + aabb_max) - extent_min);
+    // This should successfully convert to u16 since scaled_extent should be between 0 and
+    // u16::MAX and the coefficient should be between 0.0 and 1.0, but in the case of
+    // positive/negative infinity (width or height is 0.0) or NAN (inputs contain NAN) we
+    // want to continue.
+    value.to_u16().unwrap_or(
+        // Saturate.
+        if value > f64::from(u16::MAX) {
+            u16::MAX
+        } else if value < f64::from(u16::MIN) {
+            u16::MIN
+        } else {
+            // NAN.
+            0
+        },
+    )
+}
+
+fn sort_items<T>(
+    item_boxes: &mut [AABB<T>],
+    indices: &mut [usize],
+    node_size: usize,
+    min_x: T,
+    min_y: T,
+    max_x: T,
+    max_y: T,
+) -> Result<(), StaticAABB2DIndexBuildError>
+where
+    T: IndexableNum,
+{
+    let to_f64 = |x: T| -> Result<f64, StaticAABB2DIndexBuildError> {
+        x.to_f64()
+            .ok_or(StaticAABB2DIndexBuildError::NumericCastError)
+    };
+
+    let width = to_f64(max_x - min_x)?;
+    let height = to_f64(max_y - min_y)?;
+    let extent_min_x = to_f64(min_x)?;
+    let extent_min_y = to_f64(min_y)?;
+    let hilbert_max = f64::from(u16::MAX);
+    let scaled_width = hilbert_max / width;
+    let scaled_height = hilbert_max / height;
+
+    // Maps the x and y coordinates of the center of item boxes to values in the range [0, n - 1],
+    // with the bounds of all boxes mapped to 0 and n - 1. The two-dimensional space is
+    // x: [0, n - 1] and y: [0, n - 1]; the one-dimensional Hilbert curve space is
+    // d: [0, n^2 - 1].
+    let mut hilbert_values: Vec<u32> = Vec::with_capacity(item_boxes.len());
+    for aabb in item_boxes.iter() {
+        let aabb_min_x = to_f64(aabb.min_x)?;
+        let aabb_min_y = to_f64(aabb.min_y)?;
+        let aabb_max_x = to_f64(aabb.max_x)?;
+        let aabb_max_y = to_f64(aabb.max_y)?;
+
+        let x = hilbert_coord(scaled_width, aabb_min_x, aabb_max_x, extent_min_x);
+        let y = hilbert_coord(scaled_height, aabb_min_y, aabb_max_y, extent_min_y);
+        hilbert_values.push(hilbert_xy_to_index(x, y));
+    }
+
+    sort(
+        &mut hilbert_values,
+        item_boxes,
+        indices,
+        0,
+        item_boxes.len() - 1,
+        node_size,
+    );
+    Ok(())
 }
 
 impl<T> StaticAABB2DIndexBuilder<T>
@@ -179,7 +250,7 @@ where
             // represent the R-tree (doing this now to get exact allocation required)
             let mut len = 1;
             loop {
-                n = (n as f64 / node_size as f64).ceil() as usize;
+                n = n.div_ceil(node_size);
                 len += 1;
                 if n == 1 {
                     break;
@@ -195,7 +266,7 @@ where
         let mut level_bounds: Vec<usize> = Vec::with_capacity(level_bounds_len);
         level_bounds.push(n);
         loop {
-            n = (n as f64 / node_size as f64).ceil() as usize;
+            n = n.div_ceil(node_size);
             num_nodes += n;
             level_bounds.push(num_nodes);
             if n == 1 {
@@ -232,6 +303,7 @@ where
     /// Construct a new [`StaticAABB2DIndexBuilder`] to fit exactly the specified `count` number of
     /// items.
     #[inline]
+    #[must_use]
     pub fn new(count: usize) -> Self {
         StaticAABB2DIndexBuilder::init(count, 16)
     }
@@ -246,6 +318,7 @@ where
     /// If `node_size` is less than 2 then 2 is used, if `node_size` is greater than 65535 then
     /// 65535 is used.
     #[inline]
+    #[must_use]
     pub fn new_with_node_size(count: usize, node_size: usize) -> Self {
         StaticAABB2DIndexBuilder::init(count, node_size)
     }
@@ -285,13 +358,25 @@ where
         self
     }
 
+    fn into_empty_index(self) -> StaticAABB2DIndex<T> {
+        StaticAABB2DIndex {
+            node_size: self.node_size,
+            num_items: self.num_items,
+            level_bounds: self.level_bounds,
+            boxes: Box::new([]),
+            indices: self.indices,
+        }
+    }
+
     /// Build the [`StaticAABB2DIndex`] with the boxes that have been added.
     ///
-    /// If the number of added items does not match the count given at the time the builder was
-    /// created then a [`StaticAABB2DIndexBuildError::ItemCountError`] will be returned.
+    /// # Errors
     ///
-    /// If the numeric type T fails to cast to a f64 for any reason then a
-    /// [`StaticAABB2DIndexBuildError::NumericCastError`] will be returned.
+    /// Returns [`StaticAABB2DIndexBuildError::ItemCountError`] if the number of added items does
+    /// not match the count specified at construction.
+    ///
+    /// Returns [`StaticAABB2DIndexBuildError::NumericCastError`] if the numeric type `T` fails to
+    /// cast to `f64`.
     pub fn build(mut self) -> Result<StaticAABB2DIndex<T>, StaticAABB2DIndexBuildError> {
         if self.pos != self.num_items {
             return Err(StaticAABB2DIndexBuildError::ItemCountError {
@@ -301,34 +386,33 @@ where
         }
 
         if self.num_items == 0 {
-            return Ok(StaticAABB2DIndex {
-                node_size: self.node_size,
-                num_items: self.num_items,
-                level_bounds: self.level_bounds,
-                boxes: Box::new([]),
-                indices: self.indices,
-            });
+            return Ok(self.into_empty_index());
         }
 
         #[cfg(feature = "unsafe_optimizations")]
         // SAFETY: All the item boxes are initialized (all elements from index 0 to num_items - 1).
         let item_boxes: &mut [AABB<T>] =
-            unsafe { std::mem::transmute(&mut self.boxes[0..self.num_items]) };
+            unsafe { &mut *(&raw mut self.boxes[0..self.num_items] as *mut [AABB<T>]) };
 
         #[cfg(not(feature = "unsafe_optimizations"))]
         let item_boxes = &mut self.boxes[0..self.num_items];
 
-        // calculate total bounds
-        let mut item_boxes_iter = item_boxes.iter();
-        // initialize values with first box
-        let first_box = item_boxes_iter.next().unwrap();
-        let mut min_x = first_box.min_x;
-        let mut min_y = first_box.min_y;
-        let mut max_x = first_box.max_x;
-        let mut max_y = first_box.max_y;
-        // using for_each method on iterator yields noticeable performance improvement (8-10%) for
-        // large number of items (1_000_000+ items) instead of using a for loop on the iterator
-        item_boxes_iter.for_each(|item| {
+        // Calculate total bounds.
+        let mut min_x = T::zero();
+        let mut min_y = T::zero();
+        let mut max_x = T::zero();
+        let mut max_y = T::zero();
+        // Using for_each method on iterator yields noticeable performance improvement (8-10%) for
+        // large number of items (1_000_000+ items) instead of using a for loop on the iterator.
+        item_boxes.iter().enumerate().for_each(|(i, item)| {
+            if i == 0 {
+                min_x = item.min_x;
+                min_y = item.min_y;
+                max_x = item.max_x;
+                max_y = item.max_y;
+                return;
+            }
+
             min_x = min_x.min(item.min_x);
             min_y = min_y.min(item.min_y);
             max_x = max_x.max(item.max_x);
@@ -362,71 +446,19 @@ where
             });
         }
 
-        // helper function to cast T to f64
-        let cast_to_f64 = |x: T| -> Result<f64, StaticAABB2DIndexBuildError> {
-            x.to_f64()
-                .ok_or(StaticAABB2DIndexBuildError::NumericCastError)
-        };
-
-        let width = cast_to_f64(max_x - min_x)?;
-        let height = cast_to_f64(max_y - min_y)?;
-        let extent_min_x = cast_to_f64(min_x)?;
-        let extent_min_y = cast_to_f64(min_y)?;
-
-        // hilbert max input value for x and y
-        let hilbert_max = u16::MAX as f64;
-        let scaled_width = hilbert_max / width;
-        let scaled_height = hilbert_max / height;
-
-        // helper function to build hilbert coordinate value from AABB
-        fn hilbert_coord(scaled_extent: f64, aabb_min: f64, aabb_max: f64, extent_min: f64) -> u16 {
-            let value = scaled_extent * (0.5 * (aabb_min + aabb_max) - extent_min);
-            // this should successfully convert to u16 since scaled_extent should be between 0 and
-            // u16::MAX and the coefficient should be between 0.0 and 1.0, but in the case of
-            // positive/negative infinity (width or height is 0.0) or NAN (inputs contain NAN) we
-            // want to continue
-            value.to_u16().unwrap_or(
-                // saturate
-                if value > u16::MAX as f64 {
-                    u16::MAX
-                } else if value < u16::MIN as f64 {
-                    u16::MIN
-                } else {
-                    // NAN
-                    0
-                },
-            )
-        }
-
-        // mapping the x and y coordinates of the center of the item boxes to values in the range
-        // [0 -> n - 1] such that the min of the entire set of bounding boxes maps to 0 and the max
-        // of the entire set of bounding boxes maps to n - 1 our 2d space is x: [0 -> n-1] and
-        // y: [0 -> n-1], our 1d hilbert curve value space is d: [0 -> n^2 - 1]
-        let mut hilbert_values: Vec<u32> = Vec::with_capacity(self.num_items);
-        for aabb in item_boxes.iter() {
-            let aabb_min_x = cast_to_f64(aabb.min_x)?;
-            let aabb_min_y = cast_to_f64(aabb.min_y)?;
-            let aabb_max_x = cast_to_f64(aabb.max_x)?;
-            let aabb_max_y = cast_to_f64(aabb.max_y)?;
-
-            let x = hilbert_coord(scaled_width, aabb_min_x, aabb_max_x, extent_min_x);
-            let y = hilbert_coord(scaled_height, aabb_min_y, aabb_max_y, extent_min_y);
-            hilbert_values.push(hilbert_xy_to_index(x, y));
-        }
-
-        // sort items by their Hilbert value for constructing the tree
-        sort(
-            &mut hilbert_values,
+        sort_items(
             item_boxes,
             &mut self.indices,
-            0,
-            self.num_items - 1,
             self.node_size,
-        );
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+        )?;
 
         // generate nodes at each tree level, bottom-up
         let mut pos = 0;
-        for &level_end in self.level_bounds[0..self.level_bounds.len() - 1].iter() {
+        for &level_end in &self.level_bounds[0..self.level_bounds.len() - 1] {
             // generate a parent node for each block of consecutive node_size nodes
             while pos < level_end {
                 let mut node_min_x = T::max_value();
@@ -483,9 +515,10 @@ where
 /// 2d space is `x: [0 -> n-1]` and `y: [0 -> n-1]`, 1d hilbert curve value space is
 /// `d: [0 -> n^2 - 1]`, where n = 2^16, so `x` and `y` must be between 0 and [`u16::MAX`]
 /// (65535 or 2^16 - 1).
+#[must_use]
 pub fn hilbert_xy_to_index(x: u16, y: u16) -> u32 {
-    let x = x as u32;
-    let y = y as u32;
+    let x = u32::from(x);
+    let y = u32::from(y);
 
     // Fast Hilbert curve algorithm by http://threadlocalmutex.com/
     // Ported from C++ https://github.com/rawrunprotected/hilbert_curves (public domain)
@@ -530,15 +563,15 @@ pub fn hilbert_xy_to_index(x: u16, y: u16) -> u32 {
     let mut i0 = x ^ y;
     let mut i1 = b_1 | (0xFFFF ^ (i0 | a_1));
 
-    i0 = (i0 | (i0 << 8)) & 0x00FF00FF;
-    i0 = (i0 | (i0 << 4)) & 0x0F0F0F0F;
-    i0 = (i0 | (i0 << 2)) & 0x33333333;
-    i0 = (i0 | (i0 << 1)) & 0x55555555;
+    i0 = (i0 | (i0 << 8)) & 0x00FF_00FF;
+    i0 = (i0 | (i0 << 4)) & 0x0F0F_0F0F;
+    i0 = (i0 | (i0 << 2)) & 0x3333_3333;
+    i0 = (i0 | (i0 << 1)) & 0x5555_5555;
 
-    i1 = (i1 | (i1 << 8)) & 0x00FF00FF;
-    i1 = (i1 | (i1 << 4)) & 0x0F0F0F0F;
-    i1 = (i1 | (i1 << 2)) & 0x33333333;
-    i1 = (i1 | (i1 << 1)) & 0x55555555;
+    i1 = (i1 | (i1 << 8)) & 0x00FF_00FF;
+    i1 = (i1 | (i1 << 4)) & 0x0F0F_0F0F;
+    i1 = (i1 | (i1 << 2)) & 0x3333_3333;
+    i1 = (i1 | (i1 << 1)) & 0x5555_5555;
 
     (i1 << 1) | i0
 }
@@ -562,7 +595,7 @@ fn sort<T>(
         return;
     }
 
-    let mid = (left + right) / 2;
+    let mid = left.midpoint(right);
     let pivot = *get_at_index(values, mid);
     let mut i = left.wrapping_sub(1);
     let mut j = right.wrapping_add(1);
@@ -929,12 +962,14 @@ where
     /// Gets the total bounds of all the items that were added to the index or `None` if the index
     /// had no items added in construction (item count is 0).
     #[inline]
+    #[must_use]
     pub fn bounds(&self) -> Option<AABB<T>> {
         self.boxes.last().copied()
     }
 
     /// Gets the total count of items that were added to the index during construction.
     #[inline]
+    #[must_use]
     pub fn count(&self) -> usize {
         self.num_items
     }
@@ -1024,6 +1059,7 @@ where
     /// Use [`StaticAABB2DIndex::item_indices`] or [`StaticAABB2DIndex::all_box_indices`] to map a
     /// box's positional index to the original index position the item was added.
     #[inline]
+    #[must_use]
     pub fn item_boxes(&self) -> &[AABB<T>] {
         &self.boxes[0..self.num_items]
     }
@@ -1031,6 +1067,7 @@ where
     /// Used to map an item box index position from [`StaticAABB2DIndex::item_boxes`] back to the
     /// original index position the item was added.
     #[inline]
+    #[must_use]
     pub fn item_indices(&self) -> &[usize] {
         &self.indices[0..self.num_items]
     }
@@ -1040,6 +1077,7 @@ where
     /// The node size is the maximum number of boxes stored as children of each node in the index
     /// tree.
     #[inline]
+    #[must_use]
     pub fn node_size(&self) -> usize {
         self.node_size
     }
@@ -1049,6 +1087,7 @@ where
     /// The level bounds are the index positions in [`StaticAABB2DIndex::all_boxes`] where a change
     /// in the level of the index tree occurs.
     #[inline]
+    #[must_use]
     pub fn level_bounds(&self) -> &[usize] {
         &self.level_bounds
     }
@@ -1060,6 +1099,7 @@ where
     /// [`StaticAABB2DIndex::all_box_indices`] to map a box back to the original index position it
     /// was added or find the start position for the children of a node box.
     #[inline]
+    #[must_use]
     pub fn all_boxes(&self) -> &[AABB<T>] {
         &self.boxes
     }
@@ -1069,6 +1109,7 @@ where
     /// it will yield the [`StaticAABB2DIndex::all_boxes`] starting index of the node's children
     /// boxes. See the `index_tree_structure.rs` example for more information.
     #[inline]
+    #[must_use]
     pub fn all_box_indices(&self) -> &[usize] {
         &self.indices
     }
@@ -1152,7 +1193,7 @@ where
 
                 let index = *get_at_index(&self.indices, pos);
                 if node_index < self.num_items {
-                    try_control!(visitor.visit(index))
+                    try_control!(visitor.visit(index));
                 } else {
                     stack.push(index);
                     stack.push(level - 1);
@@ -1278,7 +1319,7 @@ where
             while let Some(state) = queue.pop() {
                 if state.is_leaf_node {
                     // visit leaf node
-                    try_control!(visitor.visit(state.index, state.dist))
+                    try_control!(visitor.visit(state.index, state.dist));
                 } else {
                     // update node index for next iteration
                     node_index = state.index;

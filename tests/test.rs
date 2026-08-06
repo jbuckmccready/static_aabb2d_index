@@ -263,7 +263,7 @@ fn expected_indices_order() {
 fn query() {
     let index = create_test_index();
     let mut results: Vec<usize> = index.query(40, 40, 60, 60);
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -272,7 +272,7 @@ fn query() {
 fn query_with_many_levels() {
     let index = create_index_with_node_size(&create_test_data(), 4);
     let mut results: Vec<usize> = index.query(40, 40, 60, 60);
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -281,7 +281,7 @@ fn query_with_many_levels() {
 fn query_iter() {
     let index = create_test_index();
     let mut results: Vec<usize> = index.query_iter(40, 40, 60, 60).collect();
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -290,7 +290,7 @@ fn query_iter() {
 fn query_iter_with_many_levels() {
     let index = create_index_with_node_size(&create_test_data(), 4);
     let mut results: Vec<usize> = index.query_iter(40, 40, 60, 60).collect();
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -303,7 +303,7 @@ fn query_iter_with_stack() {
     let mut results: Vec<usize> = index
         .query_iter_with_stack(40, 40, 60, 60, &mut stack)
         .collect();
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -316,7 +316,7 @@ fn query_iter_with_stack_with_many_levels() {
     let mut results: Vec<usize> = index
         .query_iter_with_stack(40, 40, 60, 60, &mut stack)
         .collect();
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -333,7 +333,7 @@ fn visit_query() {
     let break_value_result = index.visit_query(40, 40, 60, 60, &mut visitor);
     assert!(matches!(break_value_result, Control::Continue));
 
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -348,7 +348,7 @@ fn visit_query_with_many_levels() {
 
     index.visit_query(40, 40, 60, 60, &mut visitor);
 
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -367,7 +367,7 @@ fn visit_query_with_stack() {
     let break_value_result = index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
     assert!(matches!(break_value_result, Control::Continue));
 
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -384,7 +384,7 @@ fn visit_query_with_stack_with_many_levels() {
 
     index.visit_query_with_stack(40, 40, 60, 60, &mut visitor, &mut stack);
 
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -395,17 +395,17 @@ fn visit_query_stops_early() {
     let mut results = HashSet::new();
     let mut visitor = |i| {
         results.insert(i);
-        if results.len() != 2 {
-            Control::Continue
-        } else {
+        if results.len() == 2 {
             Control::Break("test")
+        } else {
+            Control::Continue
         }
     };
 
     let break_value_result = index.visit_query(40, 40, 60, 60, &mut visitor);
     assert!(matches!(break_value_result, Control::Break("test")));
     assert_eq!(results.len(), 2);
-    let expected_superset_indexes: HashSet<usize> = [6, 29, 31, 75].iter().cloned().collect();
+    let expected_superset_indexes: HashSet<usize> = [6, 29, 31, 75].iter().copied().collect();
     assert!(results.is_subset(&expected_superset_indexes));
 }
 
@@ -425,7 +425,7 @@ fn visit_neighbors_max_results() {
 
     let break_value_result = index.visit_neighbors(50, 50, &mut visitor);
     assert!(matches!(break_value_result, Control::Break("hello")));
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 31, 75];
     assert_eq!(results, expected_indexes);
 }
@@ -437,7 +437,7 @@ fn visit_neighbors_max_distance() {
     let max_distance = 12.0;
     let max_distance_squared = max_distance * max_distance;
     let mut visitor = |i, d| {
-        if (d as f64) < max_distance_squared {
+        if f64::from(d) < max_distance_squared {
             results.push(i);
             return Control::Continue;
         }
@@ -446,7 +446,7 @@ fn visit_neighbors_max_distance() {
 
     let break_value_result = index.visit_neighbors(50, 50, &mut visitor);
     assert!(matches!(break_value_result, Control::Break(42)));
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 29, 31, 75, 85];
     assert_eq!(results, expected_indexes);
 }
@@ -471,7 +471,7 @@ fn visit_neighbors_max_results_filtered() {
 
     let break_value_result = index.visit_neighbors(50, 50, &mut visitor);
     assert!(matches!(break_value_result, Control::Break(88)));
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = vec![6, 16, 18, 24, 54, 80];
     assert_eq!(results, expected_indexes);
 }
@@ -485,7 +485,7 @@ fn visit_neighbors_all_items() {
     };
 
     index.visit_neighbors(50, 50, &mut visitor);
-    results.sort();
+    results.sort_unstable();
     let expected_indexes = (0..index.count()).collect::<Vec<_>>();
     assert_eq!(results, expected_indexes);
 }

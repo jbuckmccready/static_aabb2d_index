@@ -3,7 +3,7 @@
 //! modified after creation.
 //!
 //! 2D axis aligned bounding boxes are represented by two extent points (four values):
-//! (min_x, min_y), (max_x, max_y).
+//! `(min_x, min_y), (max_x, max_y)`.
 //!
 //! This is a port of the [flatbush](https://github.com/mourner/flatbush) javascript library.
 //!
