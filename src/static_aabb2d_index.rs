@@ -211,7 +211,25 @@ where
 
         let x = hilbert_coord(scaled_width, aabb_min_x, aabb_max_x, extent_min_x);
         let y = hilbert_coord(scaled_height, aabb_min_y, aabb_max_y, extent_min_y);
-        hilbert_values.push(hilbert_xy_to_index(x, y));
+        // Push packed xy value to be converted in separate loop for SIMD lanes.
+        hilbert_values.push(u32::from(x) | (u32::from(y) << 16));
+    }
+
+    // Keeping coordinate conversion separate lets the integer Hilbert transform run in SIMD
+    // lanes when the compiler supports them.
+    for value in &mut hilbert_values {
+        *value = hilbert_index_from_packed_xy(*value);
+    }
+
+    // Sorting cannot improve node grouping when every box maps to the same Hilbert value.
+    // This is not the common case but avoids sorting when all bounding boxes are equal.
+    // This check is relatively quick and in the common case will exit on the first compare.
+    let first_hilbert_value = hilbert_values[0];
+    if hilbert_values[1..]
+        .iter()
+        .all(|&value| value == first_hilbert_value)
+    {
+        return Ok(());
     }
 
     sort(
@@ -515,8 +533,13 @@ where
 /// (65535 or 2^16 - 1).
 #[must_use]
 pub fn hilbert_xy_to_index(x: u16, y: u16) -> u32 {
-    let x = u32::from(x);
-    let y = u32::from(y);
+    hilbert_index_from_packed_xy(u32::from(x) | (u32::from(y) << 16))
+}
+
+#[inline]
+fn hilbert_index_from_packed_xy(xy: u32) -> u32 {
+    let x = xy & 0xFFFF;
+    let y = xy >> 16;
 
     // Fast Hilbert curve algorithm by http://threadlocalmutex.com/
     // Ported from C++ https://github.com/rawrunprotected/hilbert_curves (public domain)

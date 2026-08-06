@@ -103,6 +103,15 @@ fn create_index_group(c: &mut Criterion) {
         });
     }
 
+    let count = 1_000_000;
+    let identical_boxes = vec![BoundingBox(0.0, 0.0, 1.0, 1.0); count];
+    group.throughput(Throughput::Elements(count as u64));
+    group.bench_with_input(
+        BenchmarkId::new("identical", count),
+        &identical_boxes,
+        |b, boxes| bench_create_index(b, boxes),
+    );
+
     group.finish();
 }
 
