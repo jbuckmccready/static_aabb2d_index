@@ -356,20 +356,11 @@ where
         debug_assert!(min_x <= max_x);
         debug_assert!(min_y <= max_y);
 
-        #[cfg(not(feature = "unsafe_optimizations"))]
-        set_at_index(
+        write_uninit_at_index(
             &mut self.boxes,
             self.pos,
             AABB::new(min_x, min_y, max_x, max_y),
         );
-
-        #[cfg(feature = "unsafe_optimizations")]
-        // SAFETY: we checked the index bounds by comparing self.pos with self.num_items already.
-        unsafe {
-            self.boxes
-                .get_unchecked_mut(self.pos)
-                .write(AABB::new(min_x, min_y, max_x, max_y));
-        }
 
         self.pos += 1;
         self
