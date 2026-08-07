@@ -110,31 +110,31 @@ where
 // throwing a panic (so with unsafe_optimizations feature on we assume correct bounds and
 // initialization).
 #[cfg(not(feature = "unsafe_optimizations"))]
-#[inline]
+#[inline(always)]
 fn get_at_index<T>(container: &[T], index: usize) -> &T {
     &container[index]
 }
 
 #[cfg(feature = "unsafe_optimizations")]
-#[inline]
+#[inline(always)]
 fn get_at_index<T>(container: &[T], index: usize) -> &T {
     unsafe { container.get_unchecked(index) }
 }
 
 #[cfg(feature = "unsafe_optimizations")]
-#[inline]
+#[inline(always)]
 fn get_uninit_at_index<T>(container: &[std::mem::MaybeUninit<T>], index: usize) -> T {
     unsafe { container.get_unchecked(index).assume_init_read() }
 }
 
 #[cfg(not(feature = "unsafe_optimizations"))]
-#[inline]
+#[inline(always)]
 fn set_at_index<T>(container: &mut [T], index: usize, value: T) {
     container[index] = value;
 }
 
 #[cfg(feature = "unsafe_optimizations")]
-#[inline]
+#[inline(always)]
 fn set_at_index<T>(container: &mut [T], index: usize, value: T) {
     unsafe {
         *container.get_unchecked_mut(index) = value;

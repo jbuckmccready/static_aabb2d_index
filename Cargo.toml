@@ -28,4 +28,5 @@ harness = false
 bench = false
 
 [lints.clippy]
-pedantic = "warn"
+inline_always = "allow"
+pedantic = { level = "warn", priority = -1 }
