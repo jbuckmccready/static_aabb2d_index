@@ -15,11 +15,24 @@ fn grid_columns(count: usize) -> usize {
     count.saturating_sub(1).isqrt() + 1
 }
 
-fn sample_index(state: &mut u64, upper_bound: usize) -> usize {
+fn next_random(state: &mut u64) -> u64 {
     *state = state
         .wrapping_mul(6_364_136_223_846_793_005)
         .wrapping_add(1_442_695_040_888_963_407);
-    usize::try_from(*state % u64::try_from(upper_bound).unwrap()).unwrap()
+    *state
+}
+
+fn sample_index(state: &mut u64, upper_bound: usize) -> usize {
+    usize::try_from(next_random(state) % u64::try_from(upper_bound).unwrap()).unwrap()
+}
+
+fn sample_unit(state: &mut u64) -> f64 {
+    let sample = u32::try_from(next_random(state) >> 32).unwrap();
+    f64::from(sample) / (f64::from(u32::MAX) + 1.0)
+}
+
+fn usize_to_f64(value: usize) -> f64 {
+    f64::from(u32::try_from(value).unwrap())
 }
 
 #[allow(
@@ -36,6 +49,187 @@ fn create_grid_boxes(count: usize) -> Vec<BoundingBox> {
         boxes.push(BoundingBox(x, y, x + 1.0, y + 1.0));
     }
     boxes
+}
+
+fn shuffle_boxes(boxes: &mut [BoundingBox]) {
+    let mut state = 0x8EBC_6AF0_9C88_C6E3_u64;
+    for i in (1..boxes.len()).rev() {
+        boxes.swap(i, sample_index(&mut state, i + 1));
+    }
+}
+
+fn create_circle_boxes(count: usize) -> Vec<BoundingBox> {
+    let radius = 10_000.0;
+    let angle_step = std::f64::consts::TAU / usize_to_f64(count);
+    (0..count)
+        .map(|i| {
+            let angle = usize_to_f64(i) * angle_step;
+            let x = radius * angle.cos();
+            let y = radius * angle.sin();
+            BoundingBox(x, y, x + 1.0, y + 1.0)
+        })
+        .collect()
+}
+
+fn create_figure_eight_boxes(count: usize) -> Vec<BoundingBox> {
+    let radius = 10_000.0;
+    let angle_step = std::f64::consts::TAU / usize_to_f64(count);
+    (0..count)
+        .map(|i| {
+            let angle = usize_to_f64(i) * angle_step;
+            let sin = angle.sin();
+            let x = radius * sin;
+            let y = radius * sin * angle.cos();
+            BoundingBox(x, y, x + 1.0, y + 1.0)
+        })
+        .collect()
+}
+
+fn create_triangle_boxes(count: usize) -> Vec<BoundingBox> {
+    let row_count = count.saturating_mul(2).isqrt() + 1;
+    let mut boxes = Vec::with_capacity(count);
+    'rows: for row in 0..row_count {
+        let y = usize_to_f64(row) * 3.0_f64.sqrt();
+        let x_offset = -usize_to_f64(row);
+        for column in 0..=row {
+            let x = usize_to_f64(column) * 2.0 + x_offset;
+            boxes.push(BoundingBox(x, y, x + 1.0, y + 1.0));
+            if boxes.len() == count {
+                break 'rows;
+            }
+        }
+    }
+    boxes
+}
+
+fn create_clustered_boxes(count: usize) -> Vec<BoundingBox> {
+    const CENTERS: [(f64, f64); 8] = [
+        (-300.0, -300.0),
+        (0.0, -300.0),
+        (300.0, -300.0),
+        (-300.0, 0.0),
+        (300.0, 0.0),
+        (-300.0, 300.0),
+        (0.0, 300.0),
+        (300.0, 300.0),
+    ];
+    let mut state = 0xA076_1D64_78BD_642F_u64;
+    (0..count)
+        .map(|_| {
+            let (center_x, center_y) = CENTERS[sample_index(&mut state, CENTERS.len())];
+            let x = center_x + (sample_unit(&mut state) - 0.5) * 80.0;
+            let y = center_y + (sample_unit(&mut state) - 0.5) * 80.0;
+            BoundingBox(x, y, x + 1.0, y + 1.0)
+        })
+        .collect()
+}
+
+fn hilbert_index_to_xy(mut index: u32) -> (u16, u16) {
+    let original_index = index;
+    let mut x = 0;
+    let mut y = 0;
+    let mut scale = 1;
+
+    while scale < 65_536 {
+        let rotate_x = (index >> 1) & 1;
+        let rotate_y = (index ^ rotate_x) & 1;
+        if rotate_y == 0 {
+            if rotate_x == 1 {
+                x = scale - 1 - x;
+                y = scale - 1 - y;
+            }
+            std::mem::swap(&mut x, &mut y);
+        }
+        x += scale * rotate_x;
+        y += scale * rotate_y;
+        index >>= 2;
+        scale <<= 1;
+    }
+
+    let xy = (u16::try_from(x).unwrap(), u16::try_from(y).unwrap());
+    debug_assert_eq!(
+        static_aabb2d_index::hilbert_xy_to_index(xy.0, xy.1),
+        original_index
+    );
+    xy
+}
+
+fn create_two_value_boxes(count: usize) -> Vec<BoundingBox> {
+    let first_hilbert_value = static_aabb2d_index::hilbert_xy_to_index(32767, 32767);
+    let second_hilbert_value = first_hilbert_value + 1;
+    let (first_x, first_y) = hilbert_index_to_xy(first_hilbert_value);
+    let (second_x, second_y) = hilbert_index_to_xy(second_hilbert_value);
+
+    (0..count)
+        .map(|i| {
+            if i == 0 {
+                BoundingBox(0.0, 0.0, 65535.0, 65535.0)
+            } else if i % 2 == 0 {
+                let x = f64::from(first_x);
+                let y = f64::from(first_y);
+                BoundingBox(x, y, x, y)
+            } else {
+                let x = f64::from(second_x);
+                let y = f64::from(second_y);
+                BoundingBox(x, y, x, y)
+            }
+        })
+        .collect()
+}
+
+fn create_adversarial_boxes(count: usize) -> Vec<BoundingBox> {
+    assert!(count > 1);
+    let mut sorted_hilbert_values = (0..count)
+        .map(|rank| {
+            u32::try_from(
+                u64::try_from(rank).unwrap() * u64::from(u32::MAX)
+                    / u64::try_from(count - 1).unwrap(),
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+
+    // This box sets both construction extents to exactly 0..=u16::MAX while its center still maps
+    // to the chosen Hilbert value. That keeps all other generated coordinates unchanged by scaling.
+    let extent_box_hilbert_value = static_aabb2d_index::hilbert_xy_to_index(32767, 32767);
+    match sorted_hilbert_values.binary_search(&extent_box_hilbert_value) {
+        Ok(_) => {}
+        Err(position) => sorted_hilbert_values[position] = extent_box_hilbert_value,
+    }
+
+    // Assign decreasing values to the element that each recursive midpoint partition will choose.
+    // Each pivot is the range maximum, so the large left partition grows the quicksort call stack.
+    let mut positions = (0..count).collect::<Vec<_>>();
+    let mut ranks = vec![usize::MAX; count];
+    let left = 0;
+    let mut right = count - 1;
+    let mut rank = count;
+    while left / 16 < right / 16 {
+        let mid = left.midpoint(right);
+        rank -= 1;
+        ranks[positions[mid]] = rank;
+        positions.swap(mid, right);
+        right -= 1;
+    }
+    for &position in &positions[left..=right] {
+        rank -= 1;
+        ranks[position] = rank;
+    }
+    debug_assert_eq!(rank, 0);
+
+    ranks
+        .into_iter()
+        .map(|rank| {
+            let hilbert_value = sorted_hilbert_values[rank];
+            if hilbert_value == extent_box_hilbert_value {
+                return BoundingBox(0.0, 0.0, 65535.0, 65535.0);
+            }
+            let (x, y) = hilbert_index_to_xy(hilbert_value);
+            let x = f64::from(x);
+            let y = f64::from(y);
+            BoundingBox(x, y, x, y)
+        })
+        .collect()
 }
 
 fn create_single_hit_queries(boxes: &[BoundingBox]) -> Vec<BoundingBox> {
@@ -96,19 +290,64 @@ fn create_index_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("create_index");
     let item_counts = [100, 10_000, 1_000_000];
     for count in item_counts {
-        let boxes = create_grid_boxes(count);
+        let mut boxes = create_grid_boxes(count);
         group.throughput(Throughput::Elements(count as u64));
         group.bench_with_input(BenchmarkId::from_parameter(count), &boxes, |b, boxes| {
             bench_create_index(b, boxes);
         });
+        if count == 1_000_000 {
+            shuffle_boxes(&mut boxes);
+            group.bench_with_input(
+                BenchmarkId::new("shuffled_grid", count),
+                &boxes,
+                |b, boxes| bench_create_index(b, boxes),
+            );
+        }
     }
 
     let count = 1_000_000;
-    let identical_boxes = vec![BoundingBox(0.0, 0.0, 1.0, 1.0); count];
     group.throughput(Throughput::Elements(count as u64));
+    for (name, create_boxes) in [
+        (
+            "circle",
+            create_circle_boxes as fn(usize) -> Vec<BoundingBox>,
+        ),
+        ("figure_eight", create_figure_eight_boxes),
+        ("triangle", create_triangle_boxes),
+        ("clusters", create_clustered_boxes),
+    ] {
+        let mut boxes = create_boxes(count);
+        group.bench_with_input(BenchmarkId::new(name, count), &boxes, |b, boxes| {
+            bench_create_index(b, boxes);
+        });
+        shuffle_boxes(&mut boxes);
+        group.bench_with_input(
+            BenchmarkId::new(format!("shuffled_{name}"), count),
+            &boxes,
+            |b, boxes| bench_create_index(b, boxes),
+        );
+    }
+
+    let identical_boxes = vec![BoundingBox(0.0, 0.0, 1.0, 1.0); count];
     group.bench_with_input(
         BenchmarkId::new("identical", count),
         &identical_boxes,
+        |b, boxes| bench_create_index(b, boxes),
+    );
+
+    let two_value_boxes = create_two_value_boxes(count);
+    group.bench_with_input(
+        BenchmarkId::new("two_adjacent_hilbert_values", count),
+        &two_value_boxes,
+        |b, boxes| bench_create_index(b, boxes),
+    );
+
+    let count = 10_000;
+    let adversarial_boxes = create_adversarial_boxes(count);
+    group.throughput(Throughput::Elements(count as u64));
+    group.bench_with_input(
+        BenchmarkId::new("adversarial_midpoint_pivot", count),
+        &adversarial_boxes,
         |b, boxes| bench_create_index(b, boxes),
     );
 

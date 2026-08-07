@@ -247,7 +247,7 @@ fn total_extents() {
 }
 
 #[test]
-fn expected_indices_order() {
+fn expected_indices_node_groups() {
     let index = create_test_index();
     let expected_indices = &[
         95, 92, 87, 70, 67, 64, 55, 52, 49, 43, 40, 11, 26, 19, 44, 9, 59, 84, 77, 39, 6, 75, 80,
@@ -256,7 +256,66 @@ fn expected_indices_order() {
         20, 8, 96, 4, 63, 74, 5, 47, 32, 10, 98, 61, 82, 57, 97, 65, 35, 41, 2, 45, 46, 36, 42, 69,
         34, 1, 60, 15, 94, 12, 71, 0, 16, 32, 48, 64, 80, 96, 100,
     ];
-    assert_eq!(index.all_box_indices(), expected_indices);
+    for (actual, expected) in index
+        .item_indices()
+        .chunks(16)
+        .zip(expected_indices[..index.count()].chunks(16))
+    {
+        assert_eq!(
+            actual.iter().copied().collect::<HashSet<_>>(),
+            expected.iter().copied().collect::<HashSet<_>>()
+        );
+    }
+    assert_eq!(
+        &index.all_box_indices()[index.count()..],
+        &expected_indices[index.count()..]
+    );
+}
+
+#[test]
+fn generated_queries_match_brute_force() {
+    let mut state = 0xE703_7ED1_A0B4_28DB_u64;
+    let mut next_random = || {
+        state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        state
+    };
+    let input_boxes = (0..2_048)
+        .map(|_| {
+            let min_x = i32::try_from(next_random() % 2_001).unwrap() - 1_000;
+            let min_y = i32::try_from(next_random() % 2_001).unwrap() - 1_000;
+            let max_x = min_x + i32::try_from(next_random() % 64).unwrap();
+            let max_y = min_y + i32::try_from(next_random() % 64).unwrap();
+            AABB::new(min_x, min_y, max_x, max_y)
+        })
+        .collect::<Vec<_>>();
+
+    let mut builder = StaticAABB2DIndexBuilder::new_with_node_size(input_boxes.len(), 7);
+    for aabb in &input_boxes {
+        builder.add(aabb.min_x, aabb.min_y, aabb.max_x, aabb.max_y);
+    }
+    let index = builder.build().unwrap();
+
+    for (aabb, &original_index) in index.item_boxes().iter().zip(index.item_indices()) {
+        assert_eq!(*aabb, input_boxes[original_index]);
+    }
+
+    for _ in 0..256 {
+        let min_x = i32::try_from(next_random() % 2_401).unwrap() - 1_200;
+        let min_y = i32::try_from(next_random() % 2_401).unwrap() - 1_200;
+        let max_x = min_x + i32::try_from(next_random() % 300).unwrap();
+        let max_y = min_y + i32::try_from(next_random() % 300).unwrap();
+
+        let mut actual = index.query(min_x, min_y, max_x, max_y);
+        actual.sort_unstable();
+        let expected = input_boxes
+            .iter()
+            .enumerate()
+            .filter_map(|(i, aabb)| aabb.overlaps(min_x, min_y, max_x, max_y).then_some(i))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+    }
 }
 
 #[test]

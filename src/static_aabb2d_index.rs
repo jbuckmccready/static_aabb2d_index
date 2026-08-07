@@ -232,13 +232,14 @@ where
         return Ok(());
     }
 
-    sort(
+    radix_sort(
         &mut hilbert_values,
         item_boxes,
         indices,
         0,
         item_boxes.len() - 1,
         node_size,
+        1 << 31,
     );
     Ok(())
 }
@@ -597,54 +598,68 @@ fn hilbert_index_from_packed_xy(xy: u32) -> u32 {
     (i1 << 1) | i0
 }
 
-// modified quick sort that skips sorting boxes within the same node
-fn sort<T>(
+// In-place binary MSD radix sort that stops once a range lies within one tree node. This limits
+// recursion to the 32 bits in a Hilbert value and avoids ordering values that are visited together.
+fn radix_sort<T>(
     values: &mut [u32],
     boxes: &mut [AABB<T>],
     indices: &mut [usize],
     left: usize,
     right: usize,
     node_size: usize,
+    mut bit: u32,
 ) where
     T: IndexableNum,
 {
-    debug_assert!(left <= right);
+    let mut empty_partitions = 0;
+    let split = loop {
+        if left / node_size >= right / node_size || bit == 0 {
+            // A same-node range needs no ordering; at bit zero all remaining values are equal.
+            return;
+        }
 
-    if left / node_size >= right / node_size {
-        // remaining to be sorted fits within the the same node, skip sorting further
-        // since all boxes within a node must be visited when querying regardless
-        return;
-    }
-
-    let mid = left.midpoint(right);
-    let pivot = *get_at_index(values, mid);
-    let mut i = left.wrapping_sub(1);
-    let mut j = right.wrapping_add(1);
-
-    loop {
-        loop {
-            i = i.wrapping_add(1);
-            if *get_at_index(values, i) >= pivot {
+        let end = right + 1;
+        let mut i = left;
+        let mut j = end;
+        while i < j {
+            while i < j && get_at_index(values, i) & bit == 0 {
+                i += 1;
+            }
+            while i < j && get_at_index(values, j - 1) & bit != 0 {
+                j -= 1;
+            }
+            if i == j {
                 break;
             }
+            swap(values, boxes, indices, i, j - 1);
+            i += 1;
+            j -= 1;
         }
 
-        loop {
-            j = j.wrapping_sub(1);
-            if *get_at_index(values, j) <= pivot {
-                break;
+        bit >>= 1;
+        if i == left || i == end {
+            empty_partitions += 1;
+            // After two bits fail to split, one vectorizable scan is cheaper than testing each
+            // shared bit.
+            if empty_partitions == 2 {
+                let first = *get_at_index(values, left);
+                let differing_bits = values[left + 1..=right]
+                    .iter()
+                    .fold(0, |bits, &value| bits | (first ^ value));
+                if differing_bits == 0 {
+                    return;
+                }
+                bit = 1 << differing_bits.ilog2();
+                empty_partitions = 0;
             }
+            continue;
         }
 
-        if i >= j {
-            break;
-        }
+        break i;
+    };
 
-        swap(values, boxes, indices, i, j);
-    }
-
-    sort(values, boxes, indices, left, j, node_size);
-    sort(values, boxes, indices, j.wrapping_add(1), right, node_size);
+    radix_sort(values, boxes, indices, left, split - 1, node_size, bit);
+    radix_sort(values, boxes, indices, split, right, node_size, bit);
 }
 
 #[inline]
@@ -655,6 +670,110 @@ where
     values.swap(i, j);
     boxes.swap(i, j);
     indices.swap(i, j);
+}
+
+#[cfg(test)]
+mod radix_sort_tests {
+    use super::{AABB, radix_sort};
+
+    const EXHAUSTIVE_VALUES: [u32; 4] = [0, 1, 1 << 31, u32::MAX];
+
+    fn next_value(state: &mut u64) -> u32 {
+        *state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        u32::try_from(*state & u64::from(u32::MAX)).unwrap()
+    }
+
+    fn assert_node_groups_match_full_sort(original_values: &[u32], node_size: usize) {
+        let mut values = original_values.to_vec();
+        let mut expected_values = original_values.to_vec();
+        expected_values.sort_unstable();
+        let mut boxes = (0..values.len())
+            .map(|i| {
+                let i = u32::try_from(i).unwrap();
+                AABB::new(i, i, i, i)
+            })
+            .collect::<Vec<_>>();
+        let mut indices = (0..values.len()).collect::<Vec<_>>();
+        let right = values.len() - 1;
+        radix_sort(
+            &mut values,
+            &mut boxes,
+            &mut indices,
+            0,
+            right,
+            node_size,
+            1 << 31,
+        );
+
+        for ((&value, aabb), &original_index) in values.iter().zip(&boxes).zip(&indices) {
+            assert_eq!(value, original_values[original_index]);
+            assert_eq!(u32::try_from(original_index).unwrap(), aabb.min_x);
+        }
+
+        let mut sorted_indices = indices;
+        sorted_indices.sort_unstable();
+        assert_eq!(sorted_indices, (0..values.len()).collect::<Vec<_>>());
+
+        for (actual, expected) in values
+            .chunks(node_size)
+            .zip(expected_values.chunks(node_size))
+        {
+            let mut actual = actual.to_vec();
+            actual.sort_unstable();
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn radix_sort_node_groups_match_full_sort() {
+        let mut state = 0xD1B5_4A32_D192_ED03_u64;
+
+        // Check typical, duplicate-heavy, and no-split distributions across varied node sizes.
+        let random_values = (0..10_000)
+            .map(|_| next_value(&mut state))
+            .collect::<Vec<_>>();
+        let duplicate_values = (0..10_000)
+            .map(|i| [0x2AAA_AAAA, 0x2AAA_AAAB, u32::MAX][i % 3])
+            .collect::<Vec<_>>();
+
+        let equal_values = vec![0xDEAD_BEEF; 10_000];
+
+        for values in [&random_values, &duplicate_values, &equal_values] {
+            for node_size in [2, 16, 255, 65_535] {
+                assert_node_groups_match_full_sort(values, node_size);
+            }
+        }
+
+        // Exhaust short inputs using values that exercise low bits, high bits, and duplicates.
+        for len in 2..=6 {
+            for case in 0..EXHAUSTIVE_VALUES.len().pow(u32::try_from(len).unwrap()) {
+                let mut case = case;
+                let values = (0..len)
+                    .map(|_| {
+                        let value = EXHAUSTIVE_VALUES[case % EXHAUSTIVE_VALUES.len()];
+                        case /= EXHAUSTIVE_VALUES.len();
+                        value
+                    })
+                    .collect::<Vec<_>>();
+                for node_size in 2..=len + 1 {
+                    assert_node_groups_match_full_sort(&values, node_size);
+                }
+            }
+        }
+
+        // Check lengths around node boundaries with full-width and duplicate-heavy values.
+        for len in [2, 3, 15, 16, 17, 31, 32, 33, 255, 256, 257, 1_023] {
+            let random_values = (0..len).map(|_| next_value(&mut state)).collect::<Vec<_>>();
+            let duplicate_values = random_values.iter().map(|value| value & 0xF).collect();
+            for values in [&random_values, &duplicate_values] {
+                for node_size in [2, 3, 7, 16, 31, 255] {
+                    assert_node_groups_match_full_sort(values, node_size);
+                }
+            }
+        }
+    }
 }
 
 struct QueryIterator<'a, T>
