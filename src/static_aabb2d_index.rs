@@ -795,40 +795,30 @@ where
         max_x: T,
         max_y: T,
     ) -> QueryIterator<'a, T> {
-        if aabb_index.num_items == 0 {
-            // empty index
-            return Self {
-                aabb_index,
-                stack: Vec::new(),
-                min_x,
-                min_y,
-                max_x,
-                max_y,
-                node_index: 0,
-                level: 0,
-                pos: 0,
-                end: 0,
+        let (stack, node_index, level, end) =
+            if aabb_index.num_items != 0 && aabb_index.root_overlaps(min_x, min_y, max_x, max_y) {
+                let root_index = aabb_index.boxes.len() - 1;
+                let node_index = *get_at_index(&aabb_index.indices, root_index);
+                let level = aabb_index.level_bounds.len() - 2;
+                let end = min(
+                    node_index + aabb_index.node_size,
+                    *get_at_index(&aabb_index.level_bounds, level),
+                );
+                (Vec::with_capacity(16), node_index, level, end)
+            } else {
+                (Vec::new(), 0, 0, 0)
             };
-        }
-
-        let node_index = aabb_index.boxes.len() - 1;
-        let pos = node_index;
-        let level = aabb_index.level_bounds.len() - 1;
-        let end = min(
-            node_index + aabb_index.node_size,
-            *get_at_index(&aabb_index.level_bounds, level),
-        );
 
         Self {
             aabb_index,
-            stack: Vec::with_capacity(16),
+            stack,
             min_x,
             min_y,
             max_x,
             max_y,
             node_index,
             level,
-            pos,
+            pos: node_index,
             end,
         }
     }
@@ -843,10 +833,6 @@ where
     // NOTE: The inline attribute here shows significant performance improvements in benchmarks.
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.aabb_index.num_items == 0 {
-            return None;
-        }
-
         loop {
             while self.pos < self.end {
                 let current_pos = self.pos;
@@ -924,32 +910,21 @@ where
         max_x: T,
         max_y: T,
     ) -> QueryIteratorStackRef<'a, T> {
-        if aabb_index.num_items == 0 {
-            // empty index
-            return Self {
-                aabb_index,
-                stack,
-                min_x,
-                min_y,
-                max_x,
-                max_y,
-                node_index: 0,
-                level: 0,
-                pos: 0,
-                end: 0,
-            };
-        }
-
-        let node_index = aabb_index.boxes.len() - 1;
-        let pos = node_index;
-        let level = aabb_index.level_bounds.len() - 1;
-        let end = min(
-            node_index + aabb_index.node_size,
-            *get_at_index(&aabb_index.level_bounds, level),
-        );
-
         // ensure the stack is empty for use
         stack.clear();
+        let (node_index, level, end) =
+            if aabb_index.num_items != 0 && aabb_index.root_overlaps(min_x, min_y, max_x, max_y) {
+                let root_index = aabb_index.boxes.len() - 1;
+                let node_index = *get_at_index(&aabb_index.indices, root_index);
+                let level = aabb_index.level_bounds.len() - 2;
+                let end = min(
+                    node_index + aabb_index.node_size,
+                    *get_at_index(&aabb_index.level_bounds, level),
+                );
+                (node_index, level, end)
+            } else {
+                (0, 0, 0)
+            };
 
         Self {
             aabb_index,
@@ -960,7 +935,7 @@ where
             max_y,
             node_index,
             level,
-            pos,
+            pos: node_index,
             end,
         }
     }
@@ -975,10 +950,6 @@ where
     // NOTE: The inline attribute here shows significant performance improvements in benchmarks.
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.aabb_index.num_items == 0 {
-            return None;
-        }
-
         loop {
             while self.pos < self.end {
                 let current_pos = self.pos;
@@ -1176,8 +1147,8 @@ where
         C: ControlFlow,
         V: QueryVisitor<T, C>,
     {
-        if self.num_items == 0 {
-            // empty index, return early since no results to visit (avoid allocating for stack)
+        if self.num_items == 0 || !self.root_overlaps(min_x, min_y, max_x, max_y) {
+            // Return before allocating a stack when the query cannot have results.
             return C::continuing();
         }
         let mut stack: Vec<usize> = Vec::with_capacity(16);
@@ -1282,15 +1253,18 @@ where
         C: ControlFlow,
         V: QueryVisitor<T, C>,
     {
-        if self.num_items == 0 {
-            // empty index, return early since no results to visit
+        if self.num_items == 0 || !self.root_overlaps(min_x, min_y, max_x, max_y) {
             return C::continuing();
         }
         self.visit_query_with_stack_impl(min_x, min_y, max_x, max_y, visitor, stack)
     }
 
-    // Implementation function which assumes self.num_items > 0 (for performance it helped to move
-    // the self.num_items == 0 check outside of this function).
+    #[inline]
+    fn root_overlaps(&self, min_x: T, min_y: T, max_x: T, max_y: T) -> bool {
+        get_at_index(&self.boxes, self.boxes.len() - 1).overlaps(min_x, min_y, max_x, max_y)
+    }
+
+    // Implementation function which assumes the index is nonempty and the query overlaps its root.
     fn visit_query_with_stack_impl<V, C>(
         &self,
         min_x: T,
@@ -1304,8 +1278,12 @@ where
         C: ControlFlow,
         V: QueryVisitor<T, C>,
     {
-        let mut node_index = self.boxes.len() - 1;
-        let mut level = self.level_bounds.len() - 1;
+        // The caller already checked the root, so start at its children.
+        let root_index = self.boxes.len() - 1;
+        let (mut node_index, mut level) = (
+            *get_at_index(&self.indices, root_index),
+            self.level_bounds.len() - 2,
+        );
         // ensure the stack is empty for use
         stack.clear();
 
