@@ -1,26 +1,22 @@
 # StaticAABB2DIndex
 
+[![Build Status](https://github.com/jbuckmccready/static_aabb2d_index/actions/workflows/ci.yml/badge.svg)](https://github.com/jbuckmccready/static_aabb2d_index/actions)
+[![Crates.io](https://img.shields.io/crates/v/static_aabb2d_index.svg)](https://crates.io/crates/static_aabb2d_index)
+[![Docs.rs](https://docs.rs/static_aabb2d_index/badge.svg)](https://docs.rs/static_aabb2d_index)
+[![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
+[![Apache](https://img.shields.io/badge/license-Apache-blue.svg)](LICENSE-APACHE)
+
 ## Summary
 
 Fast static spatial index data structure for 2D axis aligned bounding boxes utilizing hilbert curve
-spatial ordering. This is a rust port of the excellent
-[flatbush](https://github.com/mourner/flatbush) javascript library.
+spatial ordering. This is a rust port (with changes to sorting algorithm and Rust friendly API)
+of the excellent [flatbush](https://github.com/mourner/flatbush) javascript library.
 
 By default no unsafe code is used (`#![forbid(unsafe_code)]` is applied). Some unsafe optimizations
 can be enabled by toggling on the `unsafe_optimizations` flag. Note the API is still safe when this
 flag is enabled, all optimizations are internal to the library. Currently the unsafe code is used
 to eliminate slice bounds checking and utilize uninitialized memory to avoid zeroing arrays when
 allocated.
-
-## Quick Links
-
-[Crate](https://crates.io/crates/static_aabb2d_index)
-
-[Documentation](https://docs.rs/static_aabb2d_index/latest/static_aabb2d_index/)
-
-[Examples](/examples)
-
-[Benchmarks](/benches)
 
 ## Quick Code Example
 
