@@ -31,6 +31,8 @@ x86_64 and Rust 1.97.1. All benchmarks comparing with previous release.
   | Two adjacent Hilbert values, 1,000,000 items |  56.65 ms |  20.16 ms |         64% |
   | Adversarial midpoint pivot, 10,000 items     |  24.08 ms | 177.78 µs |        135× |
 
+- Internal item ordering, and therefore query result ordering, may differ from 2.0.0 due to the new
+  radix sort. Returned item indices and query membership are unchanged.
 - Improved bounding-box query performance. Benchmarks measured:
 
   | Item count | Root-miss queries | Single-hit queries |       100-hit queries |
@@ -54,7 +56,7 @@ x86_64 and Rust 1.97.1. All benchmarks comparing with previous release.
   | `query_iter_with_stack`  |         16% |
 
 - Nearest-neighbor benchmarks mostly unchanged with maybe slight improvement.
-- Added `rust-version` to `Cargo.toml` for minimum supported Rust version
+- Set the minimum supported Rust version to 1.86 and migrated the crate to the Rust 2024 edition.
 
 ### Internal
 
