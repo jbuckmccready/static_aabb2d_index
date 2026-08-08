@@ -2,6 +2,59 @@
 
 All notable changes to the static_aabb2d_index crate will be documented in this file.
 
+## Unreleased
+
+### Changed 🔧
+
+Benchmarks used the default `cargo bench` release build without `target-cpu=native` or the
+`unsafe_optimizations` feature. They ran pinned to one core on an AMD Ryzen 9 3950X with Linux 7.1.4
+x86_64 and Rust 1.97.1. All benchmarks comparing with previous release.
+
+- Improved index construction performance through faster Hilbert index generation, in-place radix
+  sorting, and shortcuts for duplicate-heavy inputs. Benchmarks measured:
+
+  | Construction benchmark                       |    Before |     After | Improvement |
+  | -------------------------------------------- | --------: | --------: | ----------: |
+  | Grid, 100 items                              |  2.672 µs |  1.652 µs |         38% |
+  | Grid, 10,000 items                           | 459.37 µs | 317.77 µs |         31% |
+  | Grid, 1,000,000 items                        |  68.02 ms |  49.57 ms |         27% |
+  | Shuffled grid, 1,000,000 items               |  99.18 ms |  88.23 ms |         11% |
+  | Circle, 1,000,000 items                      |  53.02 ms |  42.27 ms |         20% |
+  | Shuffled circle, 1,000,000 items             |  96.59 ms |  90.19 ms |          7% |
+  | Figure eight, 1,000,000 items                |  54.87 ms |  45.40 ms |         17% |
+  | Shuffled figure eight, 1,000,000 items       |  97.45 ms |  91.55 ms |          6% |
+  | Triangle, 1,000,000 items                    |  67.52 ms |  52.89 ms |         22% |
+  | Shuffled triangle, 1,000,000 items           |  92.69 ms |  88.39 ms |          5% |
+  | Clustered, 1,000,000 items                   |  94.08 ms |  87.84 ms |          7% |
+  | Shuffled clusters, 1,000,000 items           |  94.51 ms |  89.72 ms |          5% |
+  | Identical boxes, 1,000,000 items             |  55.26 ms |  17.13 ms |         69% |
+  | Two adjacent Hilbert values, 1,000,000 items |  56.65 ms |  20.16 ms |         64% |
+  | Adversarial midpoint pivot, 10,000 items     |  24.08 ms | 177.78 µs |        135× |
+
+- Improved bounding-box query performance. Benchmarks measured:
+
+  | Item count | Root-miss queries | Single-hit queries |       100-hit queries |
+  | ---------: | ----------------: | -----------------: | --------------------: |
+  |      1,000 |        76% faster |         21% faster | No significant change |
+  |    100,000 |        77% faster |         10% faster |            14% faster |
+  |  1,000,000 |        77% faster |         13% faster |             8% faster |
+
+  Root-miss queries use a query box that does not overlap the root bounding box. They do not measure
+  queries that overlap the root but miss every indexed item.
+
+- Improved individual query APIs with a 100,000-item index and single-hit queries:
+
+  | Query API                | Improvement |
+  | ------------------------ | ----------: |
+  | `query`                  |         13% |
+  | `query_with_stack`       |         12% |
+  | `visit_query`            |          9% |
+  | `visit_query_with_stack` |         16% |
+  | `query_iter`             |          4% |
+  | `query_iter_with_stack`  |         16% |
+
+- Nearest-neighbor benchmarks mostly unchanged with maybe slight improvement.
+
 ## 2.0.0 - 2023-09-04
 
 ### Fixed 🐛
