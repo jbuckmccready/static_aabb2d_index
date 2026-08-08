@@ -6,7 +6,7 @@
 [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 [![Apache](https://img.shields.io/badge/license-Apache-blue.svg)](LICENSE-APACHE)
 
-## Summary
+---
 
 Fast static spatial index data structure for 2D axis aligned bounding boxes utilizing hilbert curve
 spatial ordering. This is a rust port (with changes to sorting algorithm and Rust friendly API)
