@@ -57,6 +57,7 @@ x86_64 and Rust 1.97.1. All benchmarks comparing with previous release.
 
 - Nearest-neighbor benchmarks mostly unchanged with maybe slight improvement.
 - Set the minimum supported Rust version to 1.86 and migrated the crate to the Rust 2024 edition.
+- Added `#[must_use]` to public functions, which may affect users of `-D warnings`.
 
 ### Internal
 
