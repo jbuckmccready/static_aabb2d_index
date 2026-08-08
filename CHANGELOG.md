@@ -2,7 +2,7 @@
 
 All notable changes to the static_aabb2d_index crate will be documented in this file.
 
-## Unreleased
+## 2.1.0 - 2026-08-08
 
 ### Changed 🔧
 
@@ -54,6 +54,12 @@ x86_64 and Rust 1.97.1. All benchmarks comparing with previous release.
   | `query_iter_with_stack`  |         16% |
 
 - Nearest-neighbor benchmarks mostly unchanged with maybe slight improvement.
+- Added `rust-version` to `Cargo.toml` for minimum supported Rust version
+
+### Internal
+
+- Use more clippy lints and fix up code accordingly
+- Moved benchmarks into the repo and added more benchmarks for better coverage
 
 ## 2.0.0 - 2023-09-04
 
